@@ -1,0 +1,34 @@
+
+Unrecognized project D:/projects/reseller-pro
+
+Untrusted projects run in Restricted Mode to protect your system.
+
+Trusting this project would enable:
+  - local PsySH binary
+
+
+Local PsySH version detected at D:/projects/reseller-pro.
+Re-run PsySH to use the trusted local version, or pass --trust-project to use it immediately.
+
+
+   InvalidArgumentException 
+
+  Unexpected end of input
+
+  at vendor\psy\psysh\src\Shell.php:1100
+    1096▕ 
+    1097▕         if (!$this->hasValidCode()) {
+    1098▕             $this->popCodeStack();
+    1099▕ 
+  ➜ 1100▕             throw new \InvalidArgumentException('Unexpected end of input');
+    1101▕         }
+    1102▕     }
+    1103▕ 
+    1104▕     /**
+
+  1   vendor\psy\psysh\src\Shell.php:1638
+      Psy\Shell::setCode("App\Models\User::first()-")
+
+  2   vendor\laravel\tinker\src\Console\TinkerCommand.php:76
+      Psy\Shell::execute("App\Models\User::first()-")
+
