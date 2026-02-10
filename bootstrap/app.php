@@ -11,7 +11,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // Hier vertellen we Laravel dat deze route GEEN token nodig heeft
+        $middleware->validateCsrfTokens(except: [
+            'superbuy/import-extension',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -5,6 +5,7 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ParcelController;
 use App\Http\Controllers\PresetController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\SuperbuyController; // <--- Toegevoegd
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function ()
@@ -12,6 +13,7 @@ Route::get('/', function ()
     return redirect()->route('login');
 });
 
+// Beveiligde routes (vereist inloggen)
 Route::middleware(['auth', 'verified'])->group(function ()
 {
     // Dashboard
@@ -26,10 +28,10 @@ Route::middleware(['auth', 'verified'])->group(function ()
     Route::get('/inventory/archive', [InventoryController::class, 'index'])->name('inventory.archive');
     Route::resource('inventory', InventoryController::class)->except(['show']);
 
-    // Superbuy Integration
-    Route::get('/superbuy', [\App\Http\Controllers\SuperbuyController::class, 'index'])->name('superbuy.index');
-    Route::post('/superbuy/fetch', [\App\Http\Controllers\SuperbuyController::class, 'fetch'])->name('superbuy.fetch');
-    Route::post('/superbuy/import', [\App\Http\Controllers\SuperbuyController::class, 'import'])->name('superbuy.import');
+    // Superbuy Integration (Web)
+    Route::get('/superbuy', [SuperbuyController::class, 'index'])->name('superbuy.index');
+    Route::post('/superbuy/fetch', [SuperbuyController::class, 'fetch'])->name('superbuy.fetch');
+    Route::post('/superbuy/import', [SuperbuyController::class, 'import'])->name('superbuy.import');
 
     // Pakketten (Parcels)
     Route::resource('parcels', ParcelController::class)->except(['show']);
@@ -47,3 +49,8 @@ Route::middleware(['auth', 'verified'])->group(function ()
 });
 
 require __DIR__ . '/auth.php';
+
+// --- EXTENSIE ROUTE (BUITEN DE AUTH MIDDLEWARE) ---
+// Dit is de fix voor de 404 error.
+Route::post('/superbuy/import-extension', [SuperbuyController::class, 'importFromExtension'])
+    ->name('superbuy.import_extension');
