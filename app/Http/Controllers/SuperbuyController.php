@@ -94,6 +94,34 @@ class SuperbuyController extends Controller
         ]);
     }
 
+/**
+     * Checkt welke ordernummers al in de database staan.
+     */
+    public function checkExistingItems(Request $request)
+    {
+        // 1. Secret Check (Dezelfde beveiliging als bij import)
+        $secret = config('services.superbuy.secret');
+        if ($request->input('secret') !== $secret) {
+            return response()->json(['error' => 'Unauthorized'], 401);
+        }
+
+        $orderNos = $request->input('order_nos');
+
+        if (!$orderNos || !is_array($orderNos)) {
+            return response()->json(['existing' => []]);
+        }
+
+        // 2. Zoek in de database welke van deze nummers al bestaan
+        // We zoeken op de kolom 'order_nmr' (zoals in je database migratie)
+        $existing = \App\Models\Item::whereIn('order_nmr', $orderNos)
+                    ->pluck('order_nmr')
+                    ->toArray();
+
+        return response()->json([
+            'existing' => $existing
+        ]);
+    }
+
     public function import(Request $request)
     {
         $request->validate([

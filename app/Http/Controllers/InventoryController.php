@@ -45,6 +45,8 @@ class InventoryController extends Controller
             $query->where('category', $request->category);
         }
 
+
+        
         // 4. Filteren op Merk
         if ($request->filled('brand')) {
             $query->where('brand', $request->brand);
@@ -271,6 +273,15 @@ class InventoryController extends Controller
         }
 
         return redirect()->back()->with('success', "$count items bijgewerkt!");
+    }
+
+public function checkStatus()
+    {
+        // We sturen het totaal aantal items en de tijd van de allerlaatste wijziging terug
+        return response()->json([
+            'count' => \App\Models\Item::count(),
+            'last_update' => \App\Models\Item::max('updated_at'),
+        ]);
     }
 
     // --- IMPORT LOGICA ---

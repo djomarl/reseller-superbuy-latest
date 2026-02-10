@@ -46,7 +46,10 @@ Route::middleware(['auth', 'verified'])->group(function ()
 
     // Rapport
     Route::get('/dashboard/report', [DashboardController::class, 'report'])->name('dashboard.report');
-});
+
+    // Live Check Route
+    Route::get('/inventory/status', [InventoryController::class, 'checkStatus'])->name('inventory.status');
+    });
 
 require __DIR__ . '/auth.php';
 
@@ -54,3 +57,7 @@ require __DIR__ . '/auth.php';
 // Dit is de fix voor de 404 error.
 Route::post('/superbuy/import-extension', [SuperbuyController::class, 'importFromExtension'])
     ->name('superbuy.import_extension');
+
+    // Check of items al bestaan (voor de extensie)
+Route::post('/superbuy/check-items', [SuperbuyController::class, 'checkExistingItems'])
+    ->name('superbuy.check');

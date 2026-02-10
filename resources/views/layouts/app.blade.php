@@ -164,4 +164,66 @@
         @endif
     </div>
 </body>
+
+<div id="update-notification" style="display: none; position: fixed; top: 20px; right: 20px; background-color: #10b981; color: white; padding: 16px 24px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 50; align-items: center; gap: 12px; transform: translateY(-100px); transition: transform 0.3s ease-out;">
+        <span style="font-size: 20px;">🔔</span>
+        <div>
+            <div style="font-weight: bold; font-size: 14px;">Nieuwe updates gevonden!</div>
+            <div id="update-msg" style="font-size: 12px; opacity: 0.9;">Klik om te verversen</div>
+        </div>
+        <button onclick="window.location.reload()" style="margin-left: 12px; background: white; color: #10b981; border: none; padding: 6px 12px; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 12px;">
+            Verversen
+        </button>
+        <button onclick="document.getElementById('update-notification').style.transform = 'translateY(-100px)'" style="background: none; border: none; color: white; margin-left: 8px; cursor: pointer; font-size: 16px; opacity: 0.8;">&times;</button>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let initialCount = null;
+            let lastUpdate = null;
+
+            // 1. Haal de start-status op zodra de pagina laadt
+            fetchStatus(true);
+
+            // 2. Check elke 5 seconden of er iets veranderd is
+            setInterval(() => {
+                fetchStatus(false);
+            }, 5000);
+
+            function fetchStatus(isFirstLoad) {
+                fetch("{{ route('inventory.status') }}")
+                    .then(response => response.json())
+                    .then(data => {
+                        if (isFirstLoad) {
+                            initialCount = data.count;
+                            lastUpdate = data.last_update;
+                        } else {
+                            // Als het aantal items is toegenomen OF de laatste update nieuwer is
+                            if (data.count > initialCount || data.last_update !== lastUpdate) {
+                                showNotification(data.count - initialCount);
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Status check failed:', error));
+            }
+
+            function showNotification(diff) {
+                const el = document.getElementById('update-notification');
+                const msg = document.getElementById('update-msg');
+                
+                if (diff > 0) {
+                    msg.innerText = `${diff} nieuwe item(s) geïmporteerd via Extensie.`;
+                } else {
+                    msg.innerText = "Er zijn wijzigingen in je voorraad.";
+                }
+
+                el.style.display = 'flex';
+                // Kleine vertraging voor de animatie
+                setTimeout(() => {
+                    el.style.transform = 'translateY(0)';
+                }, 10);
+            }
+        });
+    </script>
+
 </html>

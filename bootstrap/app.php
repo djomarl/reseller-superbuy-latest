@@ -14,7 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Hier vertellen we Laravel dat deze route GEEN token nodig heeft
         $middleware->validateCsrfTokens(except: [
             'superbuy/import-extension',
+            'superbuy/check-items',
         ]);
+        
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
