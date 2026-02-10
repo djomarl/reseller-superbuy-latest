@@ -43,6 +43,9 @@ Route::middleware(['auth', 'verified'])->group(function ()
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    
+    // NIEUW: Route voor het genereren van de secret
+    Route::patch('/profile/secret', [ProfileController::class, 'generateSecret'])->name('profile.secret');
 
     // Rapport
     Route::get('/dashboard/report', [DashboardController::class, 'report'])->name('dashboard.report');

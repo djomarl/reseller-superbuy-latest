@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 use App\Models\ItemTemplate;
 
@@ -27,6 +28,7 @@ class User extends Authenticatable
         'layout',
         'superbuy_cookie',
         'superbuy_user_agent',
+        'sync_secret',
     ];
 
     /**
@@ -55,5 +57,15 @@ class User extends Authenticatable
     public function itemTemplates(): HasMany
     {
         return $this->hasMany(ItemTemplate::class);
+    }
+
+    protected static function boot()
+    {
+        parent::boot();
+        static::creating(function ($user) {
+            if (empty($user->sync_secret)) {
+                $user->sync_secret = 'sb_' . Str::random(32);
+            }
+        });
     }
 }

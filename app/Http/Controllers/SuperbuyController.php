@@ -54,21 +54,18 @@ class SuperbuyController extends Controller
      */
     public function importFromExtension(Request $request)
     {
-        // 1. Haal het wachtwoord op uit de config (die weer uit .env komt)
-        $secret = config('services.superbuy.secret');
         $receivedSecret = $request->input('secret');
 
-        // DEBUG: Als dit leeg is, moet je 'php artisan config:clear' draaien!
-        if ($receivedSecret !== $secret) {
-             Log::error("Superbuy Sync Mismatch! Ontvangen: '{$receivedSecret}' | Verwacht: '{$secret}'");
-             return response()->json(['error' => 'Geheim wachtwoord onjuist! Check logs.'], 401);
+        if (!$receivedSecret) {
+            return response()->json(['error' => 'Geen secret ontvangen.'], 401);
         }
 
-        // 2. We pakken de eerste user (Admin) omdat de extensie niet ingelogd is
-        $user = User::first(); 
-        
+        // Zoek de gebruiker die bij deze secret hoort
+        $user = User::where('sync_secret', $receivedSecret)->first();
+
         if (!$user) {
-            return response()->json(['error' => 'Geen gebruikers gevonden in database.'], 500);
+            Log::warning("Superbuy Sync: Ongeldige secret geprobeerd: '{$receivedSecret}'");
+            return response()->json(['error' => 'Ongeldige Secret Key.'], 401);
         }
 
         $items = $request->input('items');
@@ -90,7 +87,7 @@ class SuperbuyController extends Controller
 
         return response()->json([
             'success' => true, 
-            'message' => "$count items opgeslagen!"
+            'message' => "$count items opgeslagen voor " . $user->name
         ]);
     }
 
@@ -99,10 +96,18 @@ class SuperbuyController extends Controller
      */
     public function checkExistingItems(Request $request)
     {
-        // 1. Secret Check (Dezelfde beveiliging als bij import)
-        $secret = config('services.superbuy.secret');
-        if ($request->input('secret') !== $secret) {
-            return response()->json(['error' => 'Unauthorized'], 401);
+        $receivedSecret = $request->input('secret');
+
+        if (!$receivedSecret) {
+            return response()->json(['error' => 'Geen secret ontvangen.'], 401);
+        }
+
+        // Zoek de gebruiker die bij deze secret hoort
+        $user = User::where('sync_secret', $receivedSecret)->first();
+
+        if (!$user) {
+            Log::warning("Superbuy Sync: Ongeldige secret geprobeerd (check): '{$receivedSecret}'");
+            return response()->json(['error' => 'Ongeldige Secret Key.'], 401);
         }
 
         $orderNos = $request->input('order_nos');
@@ -113,7 +118,9 @@ class SuperbuyController extends Controller
 
         // 2. Zoek in de database welke van deze nummers al bestaan
         // We zoeken op de kolom 'order_nmr' (zoals in je database migratie)
-        $existing = \App\Models\Item::whereIn('order_nmr', $orderNos)
+        // En OPTIONEEL: filter op user_id, zodat gebruikers alleen hun eigen items zien
+        $existing = \App\Models\Item::where('user_id', $user->id)
+                    ->whereIn('order_nmr', $orderNos)
                     ->pluck('order_nmr')
                     ->toArray();
 

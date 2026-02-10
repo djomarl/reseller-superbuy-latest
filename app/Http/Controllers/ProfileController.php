@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\View\View;
+use Illuminate\Support\Str;
 
 class ProfileController extends Controller
 {
@@ -120,5 +121,19 @@ class ProfileController extends Controller
         $request->session()->regenerateToken();
 
         return Redirect::to('/');
+    }
+
+    /**
+     * Genereer een nieuwe Sync Secret voor de gebruiker.
+     */
+    public function generateSecret(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        
+        // Genereer nieuwe code
+        $user->sync_secret = 'sb_' . Str::random(32);
+        $user->save();
+
+        return Redirect::route('profile.edit')->with('status', 'secret-updated');
     }
 }
