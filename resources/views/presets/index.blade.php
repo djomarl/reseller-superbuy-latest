@@ -17,7 +17,7 @@
                             @paste.window="handlePaste($event)"
                             class="w-24 h-24 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50 transition-all bg-slate-50 overflow-hidden relative group"
                         >
-                            <img x-show="imageUrl" :src="imageUrl" class="w-full h-full object-cover">
+                            <img x-show="imageUrl" :src="imageUrl" class="w-full h-full object-cover" referrerpolicy="no-referrer">
                             <span x-show="!imageUrl" class="text-slate-400 text-xs text-center px-2">Plak (Ctrl+V)</span>
                             <input type="hidden" name="image_url" :value="imageUrl">
                         </div>
@@ -67,7 +67,7 @@
                 <div class="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition flex items-center gap-4 group relative">
                     <div class="w-16 h-16 bg-slate-50 rounded-2xl overflow-hidden border border-slate-100">
                         @if($tpl->image_url)
-                            <img src="{{ $tpl->image_url }}" class="w-full h-full object-cover">
+                            <img src="{{ $tpl->image_url }}" class="w-full h-full object-cover" referrerpolicy="no-referrer">
                         @endif
                     </div>
                     <div>

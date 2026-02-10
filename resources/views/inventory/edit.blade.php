@@ -75,9 +75,9 @@
                         <div class="text-xs text-slate-500 uppercase font-bold mb-1">Preview</div>
                         <div class="w-full h-40 rounded-xl border border-slate-200 bg-slate-50 overflow-hidden flex items-center justify-center">
                             @if($item->image_url)
-                                <img id="image_preview" src="{{ $item->image_url }}" class="w-full h-full object-cover" />
+                                <img id="image_preview" src="{{ $item->image_url }}" class="w-full h-full object-cover" referrerpolicy="no-referrer" />
                             @else
-                                <img id="image_preview" class="hidden w-full h-full object-cover" />
+                                <img id="image_preview" class="hidden w-full h-full object-cover" referrerpolicy="no-referrer" />
                                 <span id="image_placeholder" class="text-slate-400 text-sm">Geen afbeelding</span>
                             @endif
                         </div>

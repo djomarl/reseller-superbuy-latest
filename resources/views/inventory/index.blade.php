@@ -13,6 +13,7 @@
             editingItem: {},
             sellingItem: {},
             qcPhotos: [],
+            qcItem: null,
             currentQcIndex: 0,
             
             // Hier laden we de templates in vanuit de controller
@@ -83,10 +84,41 @@
                 }
                 this.showSellModal = true;
             },
-            openQc(photos) {
+            openQc(photos, item) {
                 this.qcPhotos = photos || [];
+                this.qcItem = item || null;
                 this.currentQcIndex = 0;
                 this.showQcModal = true;
+            },
+            async setMainImage() {
+                if (!this.qcItem || this.qcPhotos.length === 0) return;
+                const imageUrl = this.qcPhotos[this.currentQcIndex];
+
+                if(!confirm('Wil je deze foto instellen als hoofdafbeelding?')) return;
+
+                try {
+                    const response = await fetch(`/inventory/${this.qcItem.id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').getAttribute('content'),
+                            'Accept': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            _method: 'PATCH',
+                            image_url: imageUrl
+                        })
+                    });
+
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        alert('Kon afbeelding niet instellen.');
+                    }
+                } catch (e) {
+                    console.error(e);
+                    alert('Er ging iets mis.');
+                }
             },
             initSortable() {
                 if(this.viewMode === 'table') {
@@ -320,7 +352,7 @@
                                 <div class="flex gap-4">
                                     <div class="w-16 h-16 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
                                         @if($item->image_url)
-                                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover">
+                                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover" referrerpolicy="no-referrer">
                                         @else
                                             <div class="w-full h-full flex items-center justify-center text-slate-300 text-xs">Geen img</div>
                                         @endif
@@ -360,7 +392,7 @@
                             </td>
                             <td class="px-6 py-4 align-top">
                                 @if(!empty($item->qc_photos))
-                                    <button type="button" @click="openQc({{ Js::from($item->qc_photos) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1.5 whitespace-nowrap">
+                                    <button type="button" @click="openQc({{ Js::from($item->qc_photos) }}, {{ Js::from($item) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1.5 whitespace-nowrap">
                                         <i class="fa-solid fa-camera"></i> QC ({{ count($item->qc_photos) }})
                                     </button>
                                 @else
@@ -421,7 +453,7 @@
                     </div>
                     <div class="h-44 bg-slate-100 overflow-hidden relative">
                         @if($item->image_url)
-                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover">
+                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover" referrerpolicy="no-referrer">
                         @else
                             <div class="w-full h-full flex items-center justify-center text-slate-400 text-sm">Geen afbeelding</div>
                         @endif
@@ -463,7 +495,7 @@
                         <div class="flex justify-between items-center pt-3 border-t border-slate-100 gap-2">
                             <div>
                                 @if(!empty($item->qc_photos))
-                                    <button @click="openQc({{ Js::from($item->qc_photos) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1">
+                                    <button @click="openQc({{ Js::from($item->qc_photos) }}, {{ Js::from($item) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1">
                                         <i class="fa-solid fa-camera"></i> QC
                                     </button>
                                 @endif
@@ -493,7 +525,7 @@
                 <div x-show="showEditModal" @click="showEditModal = false" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
                 <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-6">
+                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-6" enctype="multipart/form-data">
                         @csrf @method('PATCH')
                         <div class="mb-5 flex justify-between items-center">
                             <h3 class="text-lg leading-6 font-bold text-gray-900" id="modal-title">Snel Bewerken</h3>
@@ -531,6 +563,10 @@
                                 <label class="block text-sm font-medium text-slate-700">Notities</label>
                                 <textarea name="notes" x-model="editingItem.notes" rows="3" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
                             </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Afbeelding</label>
+                                <input type="file" name="image" accept="image/*" class="mt-1 block w-full text-slate-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                            </div>
                         </div>
                         <div class="mt-6 flex justify-end gap-3">
                             <button type="button" @click="showEditModal = false" class="bg-white py-2 px-4 border border-slate-300 rounded-xl shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none transition">Annuleren</button>
@@ -548,12 +584,16 @@
 
                 <div class="inline-block align-bottom bg-transparent rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full max-w-5xl">
                      <div class="relative bg-black rounded-lg overflow-hidden">
+                        <button type="button" @click="setMainImage()" class="absolute top-4 left-4 text-xs font-bold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 z-50 shadow-lg flex items-center gap-2">
+                            <i class="fa-solid fa-image"></i> Stel in als hoofdfoto
+                        </button>
+
                         <button type="button" @click="showQcModal = false" class="absolute top-4 right-4 text-white hover:text-gray-300 z-50 bg-black/50 rounded-full p-2">
                             <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                         
                         <div class="flex items-center justify-center h-[80vh] relative">
-                             <img :src="qcPhotos[currentQcIndex]" class="max-h-full max-w-full object-contain">
+                             <img :src="qcPhotos[currentQcIndex]" class="max-h-full max-w-full object-contain" referrerpolicy="no-referrer">
                              
                              <button x-show="qcPhotos.length > 1" @click="currentQcIndex = (currentQcIndex - 1 + qcPhotos.length) % qcPhotos.length" class="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition">
                                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
@@ -565,7 +605,7 @@
                         
                         <div class="bg-slate-900 p-4 flex gap-2 overflow-x-auto justify-center">
                             <template x-for="(photo, index) in qcPhotos" :key="index">
-                                <img :src="photo" @click="currentQcIndex = index" 
+                                <img :src="photo" referrerpolicy="no-referrer" @click="currentQcIndex = index" 
                                 class="h-16 w-16 object-cover rounded cursor-pointer border-2 transition opacity-70 hover:opacity-100"
                                 :class="currentQcIndex === index ? 'border-indigo-500 opacity-100' : 'border-transparent'">
                             </template>
