@@ -56,7 +56,7 @@ class InventoryController extends Controller
         }
 
         // Data ophalen (met paginering voor de cards view)
-        $items = $query->with('parcel')->latest()->paginate(24)->withQueryString();
+        $items = $query->with('parcel')->orderBy('sort_order', 'desc')->latest()->paginate(24)->withQueryString();
 
         // Data voor de filters en dropdowns
         $categories = Item::where('user_id', $userId)->whereNotNull('category')->distinct()->pluck('category')->sort();
@@ -181,6 +181,46 @@ class InventoryController extends Controller
         }
         $inventory->delete();
         return redirect()->route('inventory.index')->with('success', 'Item verwijderd');
+    }
+
+    public function reorder(Request $request)
+    {
+        $request->validate([
+            'order' => 'required|array',
+            'order.*' => 'integer|exists:items,id',
+        ]);
+
+        $order = $request->input('order');
+        $userId = Auth::id();
+
+        foreach ($order as $index => $id) {
+            Item::where('id', $id)
+                ->where('user_id', $userId)
+                ->update(['sort_order' => $index]);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    public function markAsSold(Request $request, Item $item)
+    {
+        if ($item->user_id !== Auth::id()) {
+            abort(403);
+        }
+
+        $validated = $request->validate([
+            'sell_price' => 'required|numeric|min:0',
+            'sold_date' => 'nullable|date',
+        ]);
+
+        $item->update([
+            'status' => 'sold',
+            'is_sold' => true,
+            'sell_price' => $validated['sell_price'],
+            'sold_date' => $validated['sold_date'] ?? now(),
+        ]);
+
+        return redirect()->route('inventory.index')->with('success', 'Item gemarkeerd als verkocht! 🤑');
     }
 
     public function bulkAction(Request $request)

@@ -14,14 +14,28 @@ class Item extends Model
     protected $fillable = [
         'user_id', 'parcel_id', 'item_no', 'order_nmr', 'name', 'brand', 'size',
         'category', 'buy_price', 'sell_price', 'is_sold',
-        'sold_date', 'status', 'image_url', 'qc_link', 'source_link', 'notes'
+        'sold_date', 'status', 'sort_order', 'image_url', 'qc_photos', 'source_link', 'notes'
     ];
 
     protected $casts = [
         'is_sold' => 'boolean',
         'sold_date' => 'date',
         'buy_price' => 'decimal:2',
+        'qc_photos' => 'array',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::created(function ($item) {
+            // Default sort_order to id so new items appear at top (sorted DESC)
+            if ($item->sort_order === 0 || $item->sort_order === null) {
+                $item->sort_order = $item->id;
+                $item->saveQuietly();
+            }
+        });
+    }
 
     public function user(): BelongsTo
     {

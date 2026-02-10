@@ -344,17 +344,18 @@ class SuperbuyService
 
         $status = 'todo';
         $itemStatusLower = strtolower($itemData['status']);
-        if (Str::contains($itemStatusLower, 'store') || Str::contains($itemStatusLower, 'warehouse'))
-        {
-            $status = 'online';
-        }
-        elseif (Str::contains($itemStatusLower, 'ship') || Str::contains($itemStatusLower, 'transit'))
-        {
-            $status = 'prep';
-        }
-
-        $qcLinks = !empty($itemData['qcPhotos']) ? json_encode($itemData['qcPhotos']) : null;
-        $mainQc = !empty($itemData['qcPhotos']) ? $itemData['qcPhotos'][0] : null;
+        
+        // Always default to todo for imported items unless specific logic is needed.
+        // The user specifically requested not to default to online. if needed, can revert logic.
+        
+        // if (Str::contains($itemStatusLower, 'store') || Str::contains($itemStatusLower, 'warehouse'))
+        // {
+        //    $status = 'online';
+        // }
+        // elseif (Str::contains($itemStatusLower, 'ship') || Str::contains($itemStatusLower, 'transit'))
+        // {
+        //    $status = 'prep';
+        // }
 
         return Item::firstOrCreate(
             [
@@ -367,7 +368,7 @@ class SuperbuyService
                 'buy_price' => $price,
                 'status' => $status,
                 'image_url' => $itemData['image'],
-                'qc_link' => $qcLinks,
+                'qc_photos' => $itemData['qcPhotos'] ?? [],
                 'source_link' => $itemData['link'],
                 'notes' => $itemData['options'],
             ]

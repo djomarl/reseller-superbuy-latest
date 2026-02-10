@@ -3,24 +3,61 @@
          x-data="{
             showImport: false,
             showNew: false,
+            showEditModal: false,
+            showSellModal: false,
+            showQcModal: false,
             viewMode: 'table',
             selectedItems: [],
+            lastChecked: null,
             showBulkActions: false,
+            editingItem: {},
+            sellingItem: {},
+            qcPhotos: [],
+            currentQcIndex: 0,
+            
             // Hier laden we de templates in vanuit de controller
             templates: {{ Js::from($templates) }},
+            
             toggleAll(event) {
                 if (event.target.checked) {
                     this.selectedItems = Array.from(document.querySelectorAll('.item-checkbox')).map(cb => parseInt(cb.value));
+                    // Check all checkboxes in DOM manually to ensure visual sync
+                    document.querySelectorAll('.item-checkbox').forEach(el => el.checked = true);
                 } else {
                     this.selectedItems = [];
+                    document.querySelectorAll('.item-checkbox').forEach(el => el.checked = false);
                 }
             },
-            toggleItem(id) {
-                if (this.selectedItems.includes(id)) {
-                    this.selectedItems = this.selectedItems.filter(i => i !== id);
+            toggleItem(id, event) {
+                // Handle Shift-Click for range selection
+                if (event && event.shiftKey && this.lastChecked) {
+                    const checkboxes = Array.from(document.querySelectorAll('.item-checkbox'));
+                    const start = checkboxes.findIndex(cb => parseInt(cb.value) === this.lastChecked);
+                    const end = checkboxes.findIndex(cb => parseInt(cb.value) === id);
+                    
+                    const subset = checkboxes.slice(Math.min(start, end), Math.max(start, end) + 1);
+                    subset.forEach(cb => {
+                        const val = parseInt(cb.value);
+                        if (!this.selectedItems.includes(val)) {
+                            this.selectedItems.push(val);
+                            cb.checked = true;
+                        }
+                    });
                 } else {
-                    this.selectedItems.push(id);
+                    if (this.selectedItems.includes(id)) {
+                        this.selectedItems = this.selectedItems.filter(i => i !== id);
+                    } else {
+                        this.selectedItems.push(id);
+                    }
                 }
+                this.lastChecked = id;
+            },
+            toggleRow(id, event) {
+                // Prevent toggling if clicked on button or link or input inside row
+                if (event.target.tagName === 'BUTTON' || event.target.tagName === 'A' || event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' || event.target.closest('button') || event.target.closest('a') || event.target.closest('.drag-handle')) {
+                    return;
+                }
+                this.toggleItem(id, event);
             },
             applyPreset(event) {
                 const id = event.target.value;
@@ -34,9 +71,59 @@
                     document.getElementById('new_buy_price').value = template.default_buy_price || '';
                     document.getElementById('new_sell_price').value = template.default_sell_price || '';
                 }
+            },
+            openEdit(item) {
+                this.editingItem = JSON.parse(JSON.stringify(item));
+                this.showEditModal = true;
+            },
+            openSell(item) {
+                this.sellingItem = JSON.parse(JSON.stringify(item));
+                if (!this.sellingItem.sold_date) {
+                    this.sellingItem.sold_date = new Date().toISOString().split('T')[0];
+                }
+                this.showSellModal = true;
+            },
+            openQc(photos) {
+                this.qcPhotos = photos || [];
+                this.currentQcIndex = 0;
+                this.showQcModal = true;
+            },
+            initSortable() {
+                if(this.viewMode === 'table') {
+                    const el = document.querySelector('tbody#sortable-list');
+                    if(el) {
+                        Sortable.create(el, {
+                            handle: '.drag-handle',
+                            animation: 150,
+                            onEnd: function (evt) {
+                                // Logic to save order via API
+                                // Call a function to update order
+                                updateSortOrder(); 
+                            }
+                        });
+                    }
+                }
             }
          }"
-         x-init="$watch('selectedItems', value => showBulkActions = value.length > 0)">
+         x-init="$watch('selectedItems', value => showBulkActions = value.length > 0); initSortable();">
+         
+         <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+         
+         <script>
+            function updateSortOrder() {
+                 const ids = Array.from(document.querySelectorAll('.item-row')).map(row => row.getAttribute('data-id'));
+                 fetch('{{ route("inventory.reorder") }}', {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json',
+                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                     },
+                     body: JSON.stringify({ ids: ids })
+                 }).then(res => res.json()).then(data => {
+                     console.log('Order updated');
+                 });
+            }
+         </script>
 
         @if(session('success'))
             <div class="mb-6 bg-green-100 border border-green-200 text-green-700 px-4 py-3 rounded-xl relative shadow-sm">
@@ -133,93 +220,132 @@
             </div>
         </div>
 
-        <!-- Bulk Actions Bar -->
-        <div x-show="showBulkActions" x-cloak class="bg-indigo-600 text-white rounded-2xl shadow-lg p-4 flex flex-wrap items-center gap-4 mb-6">
-            <div class="font-bold">
-                <span x-text="selectedItems.length"></span> item(s) geselecteerd
+        <!-- Sticky Bulk Actions Bar -->
+        <div x-show="showBulkActions" 
+             style="display: none;"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-10"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 translate-y-0"
+             x-transition:leave-end="opacity-0 translate-y-10"
+             class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white border border-slate-200 text-slate-800 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 z-40 w-auto max-w-4xl ring-1 ring-slate-900/5">
+            
+            <div class="flex items-center gap-2 border-r border-slate-200 pr-6">
+                <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full" x-text="selectedItems.length"></span>
+                <span class="text-sm font-semibold text-slate-600">Geselecteerd</span>
             </div>
-            <form method="POST" action="{{ route('inventory.bulkAction') }}" class="flex flex-wrap gap-2 flex-1" onsubmit="return confirm('Weet je het zeker?')">
+
+            <form method="POST" action="{{ route('inventory.bulkAction') }}" class="flex items-center gap-3" onsubmit="return confirm('Weet je het zeker?')">
                 @csrf
                 <input type="hidden" name="items" :value="JSON.stringify(selectedItems)">
-                <select name="action" required class="px-3 py-2 rounded-lg text-slate-800 text-sm font-bold">
-                    <option value="">Kies actie...</option>
-                    <option value="set_status">Status wijzigen</option>
-                    <option value="set_parcel">Pakket wijzigen</option>
-                    <option value="delete">Verwijderen</option>
-                </select>
-                <select name="status" class="px-3 py-2 rounded-lg text-slate-800 text-sm">
-                    <option value="">Status...</option>
-                    <option value="todo">To-do</option>
-                    <option value="prep">Prep</option>
-                    <option value="online">Online</option>
-                    <option value="sold">Verkocht</option>
-                </select>
-                <select name="parcel_id" class="px-3 py-2 rounded-lg text-slate-800 text-sm">
-                    <option value="">Pakket...</option>
-                    @foreach($parcels as $p)
-                        <option value="{{ $p->id }}">{{ $p->parcel_no }}</option>
-                    @endforeach
-                </select>
-                <button type="submit" class="px-4 py-2 bg-white text-indigo-600 rounded-lg font-bold hover:bg-indigo-50 transition">Toepassen</button>
-                <button type="button" @click="selectedItems = []" class="px-4 py-2 bg-indigo-500 text-white rounded-lg font-bold hover:bg-indigo-400 transition">Annuleren</button>
+                <input type="hidden" name="action" id="bulkActionInput">
+                <input type="hidden" name="status" id="bulkStatusInput">
+                <input type="hidden" name="parcel_id" id="bulkParcelInput">
+
+                <!-- Status Action -->
+                <div class="relative group">
+                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
+                        <i class="fa-solid fa-tag text-slate-400"></i> Status
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    </button>
+                    <!-- Dropdown -->
+                    <div class="absolute bottom-full left-0 mb-2 w-40 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block">
+                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='todo'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">To-do</button>
+                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='prep'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Prep</button>
+                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='online'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Online</button>
+                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='sold'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Verkocht</button>
+                    </div>
+                </div>
+
+                <!-- Parcel Action -->
+                 <div class="relative group">
+                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
+                        <i class="fa-solid fa-box text-slate-400"></i> Pakket
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    </button>
+                    <div class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block max-h-60 overflow-y-auto">
+                        @foreach($parcels as $p)
+                             <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_parcel'; document.getElementById('bulkParcelInput').value='{{ $p->id }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                                {{ $p->parcel_no }}
+                             </button>
+                        @endforeach
+                    </div>
+                </div>
+
+                <!-- Delete Action -->
+                <button type="submit" onclick="document.getElementById('bulkActionInput').value='delete'" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-red-50 text-red-600 text-sm font-semibold transition ml-2">
+                    <i class="fa-solid fa-trash"></i> Verwijderen
+                </button>
             </form>
+
+            <button @click="selectedItems = []; document.querySelectorAll('.item-checkbox').forEach(el => el.checked = false);" class="ml-auto text-slate-400 hover:text-slate-600">
+                <i class="fa-solid fa-times"></i>
+            </button>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" x-show="viewMode === 'table'" x-cloak>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider">
+                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10 shadow-sm">
                         <tr>
-                            <th class="px-4 py-4 w-12">
-                                <input type="checkbox" @change="toggleAll($event)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                            <th class="px-4 py-4 w-16">
+                                <input type="checkbox" @change="toggleAll($event)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 ml-6">
                             </th>
                             <th class="px-6 py-4">Item</th>
-                            <th class="px-6 py-4">Order Nmr</th>
-                            <th class="px-6 py-4">Categorie</th>
-                            <th class="px-6 py-4">Maat</th>
+                            <th class="px-6 py-4">Status</th>
+                            <th class="px-6 py-4">QC</th>
                             <th class="px-6 py-4">Pakket</th>
                             <th class="px-6 py-4 text-right">Inkoop</th>
                             <th class="px-6 py-4 text-right">Verkoop</th>
-                            <th class="px-6 py-4 text-center">Status</th>
                             <th class="px-6 py-4 text-right">Actie</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="divide-y divide-slate-100" id="sortable-list">
                         @forelse($items as $item)
-                        <tr class="hover:bg-slate-50/50 transition-colors group">
-                            <td class="px-4 py-4">
-                                <input type="checkbox" class="item-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        <tr class="item-row hover:bg-indigo-50/30 transition-colors group cursor-pointer border-b border-transparent"
+                            :class="selectedItems.includes({{ $item->id }}) ? '!bg-indigo-50 border-indigo-100' : ''"
+                            @click="toggleRow({{ $item->id }}, $event)"
+                            data-id="{{ $item->id }}">
+                            <td class="px-4 py-4 w-12 align-top">
+                                <div class="cursor-grab drag-handle text-slate-300 hover:text-slate-500 mr-2 inline-block">
+                                   <i class="fa-solid fa-grip-vertical"></i>
+                                </div>
+                                <input type="checkbox" class="item-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-1"
                                     value="{{ $item->id }}"
-                                    @change="toggleItem({{ $item->id }})"
+                                    @click.stop="toggleItem({{ $item->id }}, $event)"
                                     :checked="selectedItems.includes({{ $item->id }})">
                             </td>
-                            <td class="px-6 py-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
+                            <td class="px-6 py-4 align-top">
+                                <div class="flex gap-4">
+                                    <div class="w-16 h-16 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
                                         @if($item->image_url)
                                             <img src="{{ $item->image_url }}" class="w-full h-full object-cover">
+                                        @else
+                                            <div class="w-full h-full flex items-center justify-center text-slate-300 text-xs">Geen img</div>
                                         @endif
                                     </div>
-                                    <div>
-                                        <div class="font-bold text-slate-800">{{ Str::limit($item->name, 30) }}</div>
-                                        <div class="text-xs text-slate-400">{{ $item->brand }}</div>
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-bold text-slate-800 text-sm leading-tight mb-1 hover:text-indigo-600 hover:underline cursor-pointer" @click.stop="openEdit({{ Js::from($item) }})">{{ Str::limit($item->name, 50) }}</div>
+                                        <div class="text-xs text-slate-500 font-medium mb-2">{{ $item->brand ?? 'Onbekend merk' }}</div>
+                                        
+                                        <div class="flex flex-wrap gap-2 text-[10px] uppercase font-bold tracking-wide">
+                                            @if($item->size) 
+                                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span> 
+                                            @endif
+                                            <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->category ?? 'Overige' }}</span>
+                                            @if($item->order_nmr)
+                                                <span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-mono">{{ $item->order_nmr }}</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 font-mono text-slate-500">{{ $item->order_nmr ?? '-' }}</td>
-                            <td class="px-6 py-4 text-slate-600">{{ $item->category ?? '-' }}</td>
-                            <td class="px-6 py-4 font-mono text-slate-500">{{ $item->size ?? '-' }}</td>
-                            <td class="px-6 py-4 text-slate-600">
-                                {{ $item->parcel ? ($item->parcel->parcel_no ?? 'Pakket #' . $item->parcel->id) : '-' }}
-                            </td>
-                            <td class="px-6 py-4 text-right text-slate-500">€ {{ number_format($item->buy_price, 2) }}</td>
-                            <td class="px-6 py-4 text-right font-bold text-slate-800">
-                                @if($item->sell_price) € {{ number_format($item->sell_price, 2) }} @else - @endif
-                            </td>
-                            <td class="px-6 py-4 text-center">
+                            <td class="px-6 py-4 align-top">
                                 <form action="{{ route('inventory.update', $item) }}" method="POST">
                                     @csrf @method('PATCH')
-                                    <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold uppercase rounded-full px-3 py-1 border-none cursor-pointer shadow-sm transition {{ $item->status == 'sold' ? 'bg-emerald-100 text-emerald-700' : ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600') }}">
+                                    <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold uppercase rounded-lg px-2 py-1 border-none cursor-pointer shadow-sm transition ring-1 ring-inset w-24 block
+                                        {{ $item->status == 'sold' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : ($item->status == 'online' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' : 'bg-slate-50 text-slate-600 ring-slate-500/10') }}">
                                         @if($view === 'archive')
                                             <option value="sold" selected>Verkocht</option>
                                             <option value="online">Zet terug</option>
@@ -227,21 +353,51 @@
                                             <option value="todo" {{ $item->status == 'todo' ? 'selected' : '' }}>To-do</option>
                                             <option value="prep" {{ $item->status == 'prep' ? 'selected' : '' }}>Prep</option>
                                             <option value="online" {{ $item->status == 'online' ? 'selected' : '' }}>Online</option>
-                                            <option value="sold">Verkocht</option>
+                                            <option value="sold">Markeer Verkocht</option>
                                         @endif
                                     </select>
                                 </form>
                             </td>
-                            <td class="px-6 py-4 text-right flex justify-end gap-2">
-                                <a href="{{ route('inventory.edit', $item) }}" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                </a>
-                                <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
-                                    @csrf @method('DELETE')
-                                    <button class="text-red-400 hover:text-red-600 bg-red-50 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <td class="px-6 py-4 align-top">
+                                @if(!empty($item->qc_photos))
+                                    <button type="button" @click="openQc({{ Js::from($item->qc_photos) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1.5 whitespace-nowrap">
+                                        <i class="fa-solid fa-camera"></i> QC ({{ count($item->qc_photos) }})
                                     </button>
-                                </form>
+                                @else
+                                    <span class="text-slate-300 text-xs">-</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4 align-top">
+                                <span class="text-xs text-slate-600 font-medium whitespace-nowrap">
+                                    {{ $item->parcel ? ($item->parcel->parcel_no ?? 'Pakket #' . $item->parcel->id) : '-' }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 align-top text-right text-xs font-mono text-slate-500">
+                                € {{ number_format($item->buy_price, 2) }}
+                            </td>
+                            <td class="px-6 py-4 align-top text-right">
+                                <span class="font-bold text-sm text-slate-800">
+                                    @if($item->sell_price) € {{ number_format($item->sell_price, 2) }} @else <span class="text-slate-300">-</span> @endif
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 align-top text-right">
+                                <div class="flex justify-end items-center gap-2">
+                                    @if($item->status !== 'sold')
+                                        <button @click.stop="openSell({{ Js::from($item) }})" 
+                                            class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold uppercase rounded-lg px-2 py-1 transition flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/10">
+                                            <i class="fa-solid fa-money-bill-wave"></i> Verkocht
+                                        </button>
+                                    @endif
+                                    <button type="button" @click.stop="openEdit({{ Js::from($item) }})" class="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg transition text-xs font-bold ring-1 ring-indigo-200" title="Bewerken">
+                                        <i class="fa-solid fa-pen"></i> Bewerk
+                                    </button>
+                                    <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
+                                        @csrf @method('DELETE')
+                                        <button class="text-slate-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition" title="Verwijderen">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         @empty
@@ -289,7 +445,8 @@
                             <div class="text-slate-400">Inkoop: € {{ number_format($item->buy_price ?? 0, 2) }}</div>
                             <form action="{{ route('inventory.update', $item) }}" method="POST">
                                 @csrf @method('PATCH')
-                                <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold uppercase rounded-full px-3 py-1 border-none cursor-pointer shadow-sm transition {{ $item->status == 'sold' ? 'bg-emerald-100 text-emerald-700' : ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600') }}">
+                                <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold uppercase rounded-lg px-2 py-1 border-none cursor-pointer shadow-sm transition ring-1 ring-inset w-24
+                                        {{ $item->status == 'sold' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : ($item->status == 'online' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' : 'bg-slate-50 text-slate-600 ring-slate-500/10') }}">
                                     @if($view === 'archive')
                                         <option value="sold" selected>Verkocht</option>
                                         <option value="online">Zet terug</option>
@@ -303,12 +460,21 @@
                             </form>
                         </div>
 
-                        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                            <a href="{{ route('inventory.edit', $item) }}" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-3 py-2 rounded-lg text-xs font-bold">Bewerk</a>
-                            <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
-                                @csrf @method('DELETE')
-                                <button class="text-red-500 hover:text-red-700 bg-red-50 px-3 py-2 rounded-lg text-xs font-bold">Verwijder</button>
-                            </form>
+                        <div class="flex justify-between items-center pt-3 border-t border-slate-100 gap-2">
+                            <div>
+                                @if(!empty($item->qc_photos))
+                                    <button @click="openQc({{ Js::from($item->qc_photos) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1">
+                                        <i class="fa-solid fa-camera"></i> QC
+                                    </button>
+                                @endif
+                            </div>
+                            <div class="flex gap-2">
+                                <button @click="openEdit({{ Js::from($item) }})" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Bewerk</button>
+                                <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
+                                    @csrf @method('DELETE')
+                                    <button class="text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Verwijder</button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -319,6 +485,94 @@
 
         <div class="mt-6">
             {{ $items->links() }}
+        </div>
+
+        <!-- Quick Edit Modal -->
+        <div x-show="showEditModal" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div x-show="showEditModal" @click="showEditModal = false" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-6">
+                        @csrf @method('PATCH')
+                        <div class="mb-5 flex justify-between items-center">
+                            <h3 class="text-lg leading-6 font-bold text-gray-900" id="modal-title">Snel Bewerken</h3>
+                            <button type="button" @click="showEditModal = false" class="text-slate-400 hover:text-slate-500">
+                                <span class="sr-only">Sluiten</span>
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Naam</label>
+                                <input type="text" name="name" x-model="editingItem.name" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Merk</label>
+                                    <input type="text" name="brand" x-model="editingItem.brand" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Maat</label>
+                                    <input type="text" name="size" x-model="editingItem.size" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Inkoop</label>
+                                    <input type="number" step="0.01" name="buy_price" x-model="editingItem.buy_price" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700">Verkoop</label>
+                                    <input type="number" step="0.01" name="sell_price" x-model="editingItem.sell_price" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Notities</label>
+                                <textarea name="notes" x-model="editingItem.notes" rows="3" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                            </div>
+                        </div>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button type="button" @click="showEditModal = false" class="bg-white py-2 px-4 border border-slate-300 rounded-xl shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none transition">Annuleren</button>
+                            <button type="submit" class="bg-indigo-600 py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white hover:bg-indigo-700 focus:outline-none transition">Opslaan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- QC Photos Modal -->
+        <div x-show="showQcModal" style="display: none;" class="fixed inset-0 z-[110] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                <div x-show="showQcModal" @click="showQcModal = false" class="fixed inset-0 bg-slate-900 bg-opacity-90 transition-opacity" aria-hidden="true"></div>
+
+                <div class="inline-block align-bottom bg-transparent rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle w-full max-w-5xl">
+                     <div class="relative bg-black rounded-lg overflow-hidden">
+                        <button type="button" @click="showQcModal = false" class="absolute top-4 right-4 text-white hover:text-gray-300 z-50 bg-black/50 rounded-full p-2">
+                            <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                        
+                        <div class="flex items-center justify-center h-[80vh] relative">
+                             <img :src="qcPhotos[currentQcIndex]" class="max-h-full max-w-full object-contain">
+                             
+                             <button x-show="qcPhotos.length > 1" @click="currentQcIndex = (currentQcIndex - 1 + qcPhotos.length) % qcPhotos.length" class="absolute left-4 top-1/2 -translate-y-1/2 text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition">
+                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                             </button>
+                             <button x-show="qcPhotos.length > 1" @click="currentQcIndex = (currentQcIndex + 1) % qcPhotos.length" class="absolute right-4 top-1/2 -translate-y-1/2 text-white bg-black/30 hover:bg-black/60 rounded-full p-3 transition">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div class="bg-slate-900 p-4 flex gap-2 overflow-x-auto justify-center">
+                            <template x-for="(photo, index) in qcPhotos" :key="index">
+                                <img :src="photo" @click="currentQcIndex = index" 
+                                class="h-16 w-16 object-cover rounded cursor-pointer border-2 transition opacity-70 hover:opacity-100"
+                                :class="currentQcIndex === index ? 'border-indigo-500 opacity-100' : 'border-transparent'">
+                            </template>
+                        </div>
+                     </div>
+                </div>
+            </div>
         </div>
 
         <div x-show="showImport" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="showImport = false">
@@ -345,6 +599,32 @@
                     </div>
                     <textarea name="import_text" class="w-full h-40 p-4 border-slate-200 rounded-xl mb-4 text-xs font-mono bg-slate-50 focus:bg-white transition" placeholder="Of plak hier de tekst van de order..."></textarea>
                     <button class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold w-full hover:bg-indigo-700 transition">Importeren 🚀</button>
+                </form>
+             </div>
+        </div>
+
+        <div x-show="showSellModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="showSellModal = false">
+             <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm m-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-heading font-bold text-xl text-emerald-700">Money Time! 🤑</h3>
+                    <button @click="showSellModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+                </div>
+                <p class="text-slate-500 text-sm mb-4">Je staat op het punt <strong x-text="sellingItem.name"></strong> als verkocht te markeren.</p>
+                <form :action="'/inventory/' + sellingItem.id + '/sold'" method="POST">
+                    @csrf
+                    <div class="space-y-4">
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Verkoopprijs (€)*</label>
+                            <input type="number" step="0.01" name="sell_price" required x-model="sellingItem.sell_price" class="w-full p-3 rounded-xl border-emerald-200 mt-1 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-lg text-emerald-800 bg-emerald-50" placeholder="0.00" autofocus>
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Verkoopdatum</label>
+                            <input type="date" name="sold_date" x-model="sellingItem.sold_date" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                        </div>
+                        <button class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg mt-2 flex justify-center items-center gap-2">
+                           <i class="fa-solid fa-check"></i> Bevestigen
+                        </button>
+                    </div>
                 </form>
              </div>
         </div>

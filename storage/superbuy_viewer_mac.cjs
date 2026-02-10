@@ -104,7 +104,14 @@ function parseOrderHtml($, element) {
             item.options = $(tr).find('.user_orderlist_txt').text().trim(); // Kleur/Maat
             
             // Prijs staat meestal in de 2e kolom (index 1)
-            item.price = $(tr).find('td').eq(1).text().trim().replace(/\s+/g, ' ');
+            let rawPrice = $(tr).find('td').eq(1).text().trim().replace(/\s+/g, '');
+            // Strip alle valuta tekens en spaties, forceer altijd '€' voor het bedrag
+            rawPrice = rawPrice.replace(/[^\d.,-]/g, '');
+            if (rawPrice) {
+                item.price = '€' + rawPrice;
+            } else {
+                item.price = '';
+            }
             
             // Aantal
             item.qty = $(tr).find('.qty-div').text().trim();
