@@ -78,6 +78,7 @@ class SuperbuyController extends Controller
         foreach ($items as $itemData) {
             $orderNo = $itemData['orderNo'] ?? 'UNKNOWN';
             try {
+                // We geven nu de hele array door aan importItem zodat subId mee komt
                 $this->superbuyService->importItem($user, $itemData, $orderNo);
                 $count++;
             } catch (\Exception $e) {
@@ -91,8 +92,8 @@ class SuperbuyController extends Controller
         ]);
     }
 
-/**
-     * Checkt welke ordernummers al in de database staan.
+    /**
+     * Checkt welke items al in de database staan op basis van Unieke ID (DI...)
      */
     public function checkExistingItems(Request $request)
     {
@@ -102,7 +103,6 @@ class SuperbuyController extends Controller
             return response()->json(['error' => 'Geen secret ontvangen.'], 401);
         }
 
-        // Zoek de gebruiker die bij deze secret hoort
         $user = User::where('sync_secret', $receivedSecret)->first();
 
         if (!$user) {
@@ -110,19 +110,27 @@ class SuperbuyController extends Controller
             return response()->json(['error' => 'Ongeldige Secret Key.'], 401);
         }
 
-        $orderNos = $request->input('order_nos');
+        $subIds = $request->input('sub_ids'); // De DI-nummers
+        $orderNos = $request->input('order_nos'); // Fallback
 
-        if (!$orderNos || !is_array($orderNos)) {
-            return response()->json(['existing' => []]);
+        $existing = [];
+
+        // 1. NIEUW: Check specifiek op item_no (waar we het DI-nummer opslaan)
+        if ($subIds && is_array($subIds)) {
+            $existing = \App\Models\Item::where('user_id', $user->id)
+                        ->whereIn('item_no', $subIds)
+                        ->pluck('item_no')
+                        ->toArray();
         }
 
-        // 2. Zoek in de database welke van deze nummers al bestaan
-        // We zoeken op de kolom 'order_nmr' (zoals in je database migratie)
-        // En OPTIONEEL: filter op user_id, zodat gebruikers alleen hun eigen items zien
-        $existing = \App\Models\Item::where('user_id', $user->id)
-                    ->whereIn('order_nmr', $orderNos)
-                    ->pluck('order_nmr')
-                    ->toArray();
+        // 2. FALLBACK: Als er geen DI-matches zijn gevonden, kijk dan naar ordernummers
+        // (voor backward compatibility met items die je eerder hebt geïmporteerd zonder DI-nummer)
+        if (empty($existing) && $orderNos && is_array($orderNos)) {
+            $existing = \App\Models\Item::where('user_id', $user->id)
+                        ->whereIn('order_nmr', $orderNos)
+                        ->pluck('order_nmr')
+                        ->toArray();
+        }
 
         return response()->json([
             'existing' => $existing

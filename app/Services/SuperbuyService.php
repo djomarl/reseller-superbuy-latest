@@ -345,26 +345,32 @@ class SuperbuyService
         $status = 'todo';
         $itemStatusLower = strtolower($itemData['status']);
         
-        // Always default to todo for imported items unless specific logic is needed.
-        // The user specifically requested not to default to online. if needed, can revert logic.
-        
-        // if (Str::contains($itemStatusLower, 'store') || Str::contains($itemStatusLower, 'warehouse'))
-        // {
-        //    $status = 'online';
-        // }
-        // elseif (Str::contains($itemStatusLower, 'ship') || Str::contains($itemStatusLower, 'transit'))
-        // {
-        //    $status = 'prep';
-        // }
+        // Haal het unieke ID op (DI...)
+        $subId = $itemData['subId'] ?? null;
+
+        // Bepaal waarop we zoeken om duplicaten te voorkomen
+        $matchAttributes = [
+            'user_id' => $user->id,
+            'order_nmr' => $orderNo,
+        ];
+
+        // BELANGRIJK: Als we een subId hebben, gebruiken we die voor strikte uniekheid.
+        // Dit fixt de bug dat items met hetzelfde ordernummer als duplicaat worden gezien.
+        if ($subId) {
+            $matchAttributes['item_no'] = $subId;
+        } else {
+            // Fallback voor oude imports: uniek op basis van naam en maat
+            $matchAttributes['name'] = $itemData['title'];
+            $matchAttributes['size'] = substr($itemData['options'], 0, 190);
+        }
 
         return Item::firstOrCreate(
+            $matchAttributes, // Zoek op deze velden
             [
-                'user_id' => $user->id,
-                'order_nmr' => $orderNo,
+                // Vul deze velden in als het item nieuw is
+                'item_no' => $subId ?? '-', 
                 'name' => $itemData['title'],
                 'size' => substr($itemData['options'], 0, 190),
-            ],
-            [
                 'buy_price' => $price,
                 'status' => $status,
                 'image_url' => $itemData['image'],

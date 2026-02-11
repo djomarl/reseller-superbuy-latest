@@ -15,9 +15,18 @@
             qcPhotos: [],
             qcItem: null,
             currentQcIndex: 0,
+            showImageModal: false,
+            activeImageUrl: null,
             
             // Hier laden we de templates in vanuit de controller
             templates: {{ Js::from($templates) }},
+
+            openImage(url) {
+                if(url) {
+                    this.activeImageUrl = url;
+                    this.showImageModal = true;
+                }
+            },
             
             toggleAll(event) {
                 if (event.target.checked) {
@@ -316,117 +325,157 @@
             </button>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" x-show="viewMode === 'table'" x-cloak>
+        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden" x-show="viewMode === 'table'" x-cloak>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 text-slate-500 font-bold uppercase text-[10px] tracking-wider sticky top-0 z-10 shadow-sm">
+                    <thead class="bg-slate-50 border-b border-slate-200">
                         <tr>
-                            <th class="px-4 py-4 w-16">
-                                <input type="checkbox" @change="toggleAll($event)" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 ml-6">
+                            <th class="px-6 py-5 w-16">
+                                <input type="checkbox" @change="toggleAll($event)" class="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
                             </th>
-                            <th class="px-6 py-4">Item</th>
-                            <th class="px-6 py-4">Status</th>
-                            <th class="px-6 py-4">QC</th>
-                            <th class="px-6 py-4">Pakket</th>
-                            <th class="px-6 py-4 text-right">Inkoop</th>
-                            <th class="px-6 py-4 text-right">Verkoop</th>
-                            <th class="px-6 py-4 text-right">Actie</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Item Details</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">QC</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Pakket</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Inkoop</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Verkoop</th>
+                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actie</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100" id="sortable-list">
+                    <tbody class="divide-y divide-slate-100 bg-white" id="sortable-list">
                         @forelse($items as $item)
-                        <tr class="item-row hover:bg-indigo-50/30 transition-colors group cursor-pointer border-b border-transparent"
-                            :class="selectedItems.includes({{ $item->id }}) ? '!bg-indigo-50 border-indigo-100' : ''"
+                        <tr class="item-row hover:bg-slate-50/80 transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-indigo-500"
+                            :class="selectedItems.includes({{ $item->id }}) ? '!bg-indigo-50/50 !border-l-indigo-600' : ''"
                             @click="toggleRow({{ $item->id }}, $event)"
                             data-id="{{ $item->id }}">
-                            <td class="px-4 py-4 w-12 align-top">
-                                <div class="cursor-grab drag-handle text-slate-300 hover:text-slate-500 mr-2 inline-block">
-                                   <i class="fa-solid fa-grip-vertical"></i>
+                            <td class="px-6 py-4 align-middle">
+                                <div class="flex items-center gap-3">
+                                    <div class="cursor-grab drag-handle text-slate-300 hover:text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                       <i class="fa-solid fa-grip-vertical"></i>
+                                    </div>
+                                    <input type="checkbox" class="item-checkbox rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+                                        value="{{ $item->id }}"
+                                        @click.stop="toggleItem({{ $item->id }}, $event)"
+                                        :checked="selectedItems.includes({{ $item->id }})">
                                 </div>
-                                <input type="checkbox" class="item-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-1"
-                                    value="{{ $item->id }}"
-                                    @click.stop="toggleItem({{ $item->id }}, $event)"
-                                    :checked="selectedItems.includes({{ $item->id }})">
                             </td>
-                            <td class="px-6 py-4 align-top">
-                                <div class="flex gap-4">
-                                    <div class="w-16 h-16 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
+                            <td class="px-6 py-4">
+                                <div class="flex gap-5 items-center">
+                                    <div class="relative w-16 h-16 rounded-xl bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200 group/img cursor-zoom-in shadow-sm" @click.stop="openImage('{{ $item->image_url }}')">
                                         @if($item->image_url)
-                                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover" referrerpolicy="no-referrer">
+                                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-110" referrerpolicy="no-referrer">
+                                            <div class="absolute inset-0 bg-black/20 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center">
+                                                <i class="fa-solid fa-magnifying-glass text-white text-xs drop-shadow-md"></i>
+                                            </div>
                                         @else
-                                            <div class="w-full h-full flex items-center justify-center text-slate-300 text-xs">Geen img</div>
+                                            <div class="w-full h-full flex items-center justify-center text-slate-300">
+                                                <i class="fa-solid fa-image text-lg"></i>
+                                            </div>
                                         @endif
                                     </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="font-bold text-slate-800 text-sm leading-tight mb-1 hover:text-indigo-600 hover:underline cursor-pointer" @click.stop="openEdit({{ Js::from($item) }})">{{ Str::limit($item->name, 50) }}</div>
-                                        <div class="text-xs text-slate-500 font-medium mb-2">{{ $item->brand ?? 'Onbekend merk' }}</div>
-                                        
-                                        <div class="flex flex-wrap gap-2 text-[10px] uppercase font-bold tracking-wide">
+                                    <div class="flex-1 min-w-0 py-1">
+                                        <div class="flex items-center gap-2 mb-1">
+                                            <span class="text-[10px] font-extrabold tracking-wider text-slate-500 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
                                             @if($item->size) 
-                                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span> 
+                                                <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span> 
                                             @endif
-                                            <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->category ?? 'Overige' }}</span>
+                                        </div>
+                                        <div class="font-bold text-slate-800 text-sm leading-tight mb-1.5 hover:text-indigo-600 cursor-pointer line-clamp-1" @click.stop="openEdit({{ Js::from($item) }})">
+                                            {{ $item->name }}
+                                        </div>
+                                        
+                                        <div class="flex flex-wrap gap-2">
+                                            <span class="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+                                                <i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> {{ $item->category ?? 'Overige' }}
+                                            </span>
                                             @if($item->order_nmr)
-                                                <span class="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 font-mono">{{ $item->order_nmr }}</span>
+                                                <span class="inline-flex items-center gap-1 text-[10px] font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                                                    #{{ $item->order_nmr }}
+                                                </span>
                                             @endif
                                         </div>
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 align-top">
+                            <td class="px-6 py-4 align-middle">
                                 <form action="{{ route('inventory.update', $item) }}" method="POST">
                                     @csrf @method('PATCH')
-                                    <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold uppercase rounded-lg px-2 py-1 border-none cursor-pointer shadow-sm transition ring-1 ring-inset w-24 block
-                                        {{ $item->status == 'sold' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : ($item->status == 'online' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' : 'bg-slate-50 text-slate-600 ring-slate-500/10') }}">
-                                        @if($view === 'archive')
-                                            <option value="sold" selected>Verkocht</option>
-                                            <option value="online">Zet terug</option>
-                                        @else
-                                            <option value="todo" {{ $item->status == 'todo' ? 'selected' : '' }}>To-do</option>
-                                            <option value="prep" {{ $item->status == 'prep' ? 'selected' : '' }}>Prep</option>
-                                            <option value="online" {{ $item->status == 'online' ? 'selected' : '' }}>Online</option>
-                                            <option value="sold">Markeer Verkocht</option>
-                                        @endif
-                                    </select>
+                                    <div class="relative">
+                                        <select name="status" onchange="this.form.submit()" 
+                                            class="appearance-none pl-3 pr-8 py-1.5 text-xs font-bold uppercase rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 transition shadow-sm w-32
+                                            {{ $item->status == 'sold' ? 'bg-emerald-100 text-emerald-700 focus:ring-emerald-500' : 
+                                               ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700 focus:ring-indigo-500' : 
+                                               ($item->status == 'prep' ? 'bg-amber-100 text-amber-700 focus:ring-amber-500' : 
+                                               'bg-slate-100 text-slate-600 focus:ring-slate-500')) }}">
+                                            @if($view === 'archive')
+                                                <option value="sold" selected>Verkocht</option>
+                                                <option value="online">Zet terug</option>
+                                            @else
+                                                <option value="todo" {{ $item->status == 'todo' ? 'selected' : '' }}>To-do</option>
+                                                <option value="prep" {{ $item->status == 'prep' ? 'selected' : '' }}>Prep</option>
+                                                <option value="online" {{ $item->status == 'online' ? 'selected' : '' }}>Online</option>
+                                                <option value="sold">Markeer Verkocht</option>
+                                            @endif
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                            <svg class="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+                                        </div>
+                                    </div>
                                 </form>
                             </td>
-                            <td class="px-6 py-4 align-top">
+                            <td class="px-6 py-4 align-middle">
                                 @if(!empty($item->qc_photos))
-                                    <button type="button" @click="openQc({{ Js::from($item->qc_photos) }}, {{ Js::from($item) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2.5 py-1 rounded-lg border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1.5 whitespace-nowrap">
-                                        <i class="fa-solid fa-camera"></i> QC ({{ count($item->qc_photos) }})
+                                    <button type="button" @click="openQc({{ Js::from($item->qc_photos) }}, {{ Js::from($item) }})" class="group flex items-center gap-2 bg-white hover:bg-purple-50 border border-slate-200 hover:border-purple-200 text-slate-600 hover:text-purple-700 px-3 py-1.5 rounded-lg transition shadow-sm">
+                                        <div class="relative">
+                                            <i class="fa-solid fa-camera text-slate-400 group-hover:text-purple-500 transition-colors"></i>
+                                            <span class="absolute -top-1 -right-1 flex h-2 w-2">
+                                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                                              <span class="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
+                                            </span>
+                                        </div>
+                                        <span class="text-xs font-bold">{{ count($item->qc_photos) }}</span>
                                     </button>
                                 @else
-                                    <span class="text-slate-300 text-xs">-</span>
+                                    <span class="inline-block w-8 h-1 bg-slate-100 rounded-full"></span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 align-top">
-                                <span class="text-xs text-slate-600 font-medium whitespace-nowrap">
-                                    {{ $item->parcel ? ($item->parcel->parcel_no ?? 'Pakket #' . $item->parcel->id) : '-' }}
-                                </span>
+                            <td class="px-6 py-4 align-middle">
+                                @if($item->parcel)
+                                    <a href="#" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 text-xs font-medium border border-slate-100 hover:bg-slate-100 transition">
+                                        <i class="fa-solid fa-box text-slate-400"></i>
+                                        {{ $item->parcel->parcel_no ?? '#' . $item->parcel->id }}
+                                    </a>
+                                @else
+                                    <span class="text-slate-300 text-lg">&middot;</span>
+                                @endif
                             </td>
-                            <td class="px-6 py-4 align-top text-right text-xs font-mono text-slate-500">
-                                € {{ number_format($item->buy_price, 2) }}
+                            <td class="px-6 py-4 align-middle text-right">
+                                <div class="font-mono text-xs font-medium text-slate-500">
+                                    €{{ number_format($item->buy_price, 2) }}
+                                </div>
                             </td>
-                            <td class="px-6 py-4 align-top text-right">
-                                <span class="font-bold text-sm text-slate-800">
-                                    @if($item->sell_price) € {{ number_format($item->sell_price, 2) }} @else <span class="text-slate-300">-</span> @endif
-                                </span>
+                            <td class="px-6 py-4 align-middle text-right">
+                                <div class="inline-block font-bold text-sm text-slate-800 bg-emerald-50/50 px-2 py-1 rounded border border-emerald-100/50">
+                                    @if($item->sell_price) €{{ number_format($item->sell_price, 2) }} @else <span class="text-slate-400">-</span> @endif
+                                </div>
                             </td>
-                            <td class="px-6 py-4 align-top text-right">
+                            <td class="px-6 py-4 align-middle text-right">
                                 <div class="flex justify-end items-center gap-2">
                                     @if($item->status !== 'sold')
                                         <button @click.stop="openSell({{ Js::from($item) }})" 
-                                            class="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-[10px] font-bold uppercase rounded-lg px-2 py-1 transition flex items-center gap-1 shadow-sm ring-1 ring-emerald-600/10">
-                                            <i class="fa-solid fa-money-bill-wave"></i> Verkocht
+                                            class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition shadow-sm hover:shadow-md flex items-center gap-1.5 border border-emerald-600">
+                                            <i class="fa-solid fa-money-bill-wave"></i> Verkopen
                                         </button>
                                     @endif
-                                    <button type="button" @click.stop="openEdit({{ Js::from($item) }})" class="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 px-3 py-1.5 rounded-lg transition text-xs font-bold ring-1 ring-indigo-200" title="Bewerken">
-                                        <i class="fa-solid fa-pen"></i> Bewerk
+
+                                    <button type="button" @click.stop="openEdit({{ Js::from($item) }})" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 rounded-lg transition shadow-sm" title="Bewerken">
+                                        <i class="fa-solid fa-pen text-xs"></i>
                                     </button>
+                                    
                                     <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
                                         @csrf @method('DELETE')
-                                        <button class="text-slate-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition" title="Verwijderen">
-                                            <i class="fa-solid fa-trash"></i>
+                                        <button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white hover:bg-red-50 border border-slate-200 rounded-lg transition shadow-sm" title="Verwijderen">
+                                            <i class="fa-solid fa-trash text-xs"></i>
                                         </button>
                                     </form>
                                 </div>
@@ -434,7 +483,12 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="10" class="text-center py-12 text-slate-400 italic">Geen items gevonden.</td>
+                            <td colspan="10" class="text-center py-20">
+                                <div class="flex flex-col items-center justify-center text-slate-300">
+                                    <i class="fa-solid fa-box-open text-4xl mb-3 opacity-50"></i>
+                                    <span class="text-sm font-medium italic">Geen items gevonden in deze weergave.</span>
+                                </div>
+                            </td>
                         </tr>
                         @endforelse
                     </tbody>
@@ -442,76 +496,150 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" x-show="viewMode === 'cards'" x-cloak>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" x-show="viewMode === 'cards'" x-cloak>
             @forelse($items as $item)
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" :class="selectedItems.includes({{ $item->id }}) ? 'ring-2 ring-indigo-500' : ''">
-                    <div class="absolute top-3 left-3 z-10">
-                        <input type="checkbox" class="item-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 bg-white shadow-lg"
-                            value="{{ $item->id }}"
-                            @change="toggleItem({{ $item->id }})"
-                            :checked="selectedItems.includes({{ $item->id }})">
-                    </div>
-                    <div class="h-44 bg-slate-100 overflow-hidden relative">
+                <div class="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:border-indigo-100 flex flex-col h-full overflow-hidden" 
+                     :class="selectedItems.includes({{ $item->id }}) ? 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100' : ''">
+                    
+                    <!-- Image Section -->
+                    <div class="relative aspect-square bg-slate-50 overflow-hidden cursor-zoom-in" @click="openImage('{{ $item->image_url }}')">
                         @if($item->image_url)
-                            <img src="{{ $item->image_url }}" class="w-full h-full object-cover" referrerpolicy="no-referrer">
+                            <img src="{{ $item->image_url }}" 
+                                 class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                                 referrerpolicy="no-referrer"
+                                 loading="lazy">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
+                                <span class="text-white font-medium text-sm flex items-center gap-2"><i class="fa-solid fa-magnifying-glass-plus"></i> Vergroten</span>
+                            </div>
                         @else
-                            <div class="w-full h-full flex items-center justify-center text-slate-400 text-sm">Geen afbeelding</div>
+                            <div class="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                                <i class="fa-solid fa-image text-3xl mb-2 opacity-50"></i>
+                                <span class="text-xs font-medium">Geen afbeelding</span>
+                            </div>
                         @endif
+
+                        <!-- Top Controls -->
+                        <div class="absolute top-3 left-3 z-10" @click.stop>
+                            <input type="checkbox" class="item-checkbox w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 bg-white/90 backdrop-blur shadow-sm cursor-pointer"
+                                value="{{ $item->id }}"
+                                @change="toggleItem({{ $item->id }})"
+                                :checked="selectedItems.includes({{ $item->id }})">
+                        </div>
+
+                        <!-- Status Badge -->
+                        <div class="absolute top-3 right-3 z-10 pointer-events-none">
+                             @if($view === 'archive' || $item->status == 'sold')
+                                <span class="inline-flex items-center gap-1 bg-emerald-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
+                                    <i class="fa-solid fa-check"></i> Verkocht
+                                </span>
+                             @elseif($item->status == 'online')
+                                <span class="inline-flex items-center gap-1 bg-indigo-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
+                                    <i class="fa-solid fa-globe"></i> Online
+                                </span>
+                             @elseif($item->status == 'prep')
+                                <span class="inline-flex items-center gap-1 bg-amber-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
+                                    <i class="fa-solid fa-box-open"></i> Prep
+                                </span>
+                             @else
+                                <span class="inline-flex items-center gap-1 bg-slate-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
+                                    <i class="fa-solid fa-list"></i> To-do
+                                </span>
+                             @endif
+                        </div>
                     </div>
-                    <div class="p-5 space-y-3">
-                        <div class="flex items-start justify-between gap-2">
-                            <div>
-                                <div class="font-bold text-slate-800">{{ Str::limit($item->name, 40) }}</div>
-                                <div class="text-xs text-slate-400">{{ $item->brand ?? '—' }}</div>
-                                <div class="text-[11px] text-slate-400">Order Nmr: <span class="font-mono">{{ $item->order_nmr ?? '-' }}</span></div>
+
+                    <!-- Content Section -->
+                    <div class="p-4 flex flex-col flex-1">
+                        <div class="mb-1 flex justify-between items-start">
+                            <span class="text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
+                            @if($item->size)
+                                <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span>
+                            @endif
+                        </div>
+                        
+                        <h3 class="font-bold text-slate-900 leading-tight mb-2 line-clamp-2 min-h-[2.5rem]" title="{{ $item->name }}">{{ $item->name }}</h3>
+                        
+                        <div class="flex items-center gap-2 mb-4">
+                            <span class="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-100 truncate max-w-[100px]">{{ $item->category ?? 'Overige' }}</span>
+                            @if($item->order_nmr)
+                                <span class="text-[10px] font-mono text-blue-500 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 truncate" title="Order #{{ $item->order_nmr }}">#{{ $item->order_nmr }}</span>
+                            @endif
+                        </div>
+
+                        <div class="mt-auto pt-4 border-t border-slate-50 flex items-center justify-between">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Verkoop</span>
+                                <span class="text-lg font-bold text-slate-900">€ {{ number_format($item->sell_price ?? 0, 2) }}</span>
                             </div>
-                            <span class="text-[10px] font-bold uppercase rounded-full px-2 py-1 border border-slate-200 text-slate-500">{{ $item->category ?? 'Overige' }}</span>
+                            @if($item->buy_price > 0)
+                            <div class="flex flex-col items-end text-right">
+                                <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Inkoop</span>
+                                <span class="text-xs font-semibold text-slate-500">€ {{ number_format($item->buy_price, 2) }}</span>
+                            </div>
+                            @endif
                         </div>
+                    </div>
 
-                        <div class="flex items-center justify-between text-sm">
-                            <div class="text-slate-500">Maat: <span class="font-mono">{{ $item->size ?? '-' }}</span></div>
-                            <div class="text-slate-800 font-bold">€ {{ number_format($item->sell_price ?? 0, 2) }}</div>
-                        </div>
+                    <!-- Action Footer -->
+                    <div class="bg-slate-50/50 p-2 border-t border-slate-100">
+                        @if($item->status !== 'sold')
+                            <div class="grid grid-cols-5 gap-2">
+                                <button @click="openSell({{ Js::from($item) }})" class="col-span-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg py-2 text-xs font-bold shadow-sm shadow-emerald-200 transition flex items-center justify-center gap-1.5 transform hover:-translate-y-0.5 active:translate-y-0">
+                                    <i class="fa-solid fa-money-bill-wave"></i> VERKOPEN
+                                </button>
+                                
+                                <button @click="openEdit({{ Js::from($item) }})" class="bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-indigo-600 rounded-lg py-2 text-xs font-bold transition flex items-center justify-center" title="Bewerken">
+                                    <i class="fa-solid fa-pen text-sm"></i>
+                                </button>
 
-                        <div class="flex items-center justify-between text-xs">
-                            <div class="text-slate-400">Inkoop: € {{ number_format($item->buy_price ?? 0, 2) }}</div>
-                            <form action="{{ route('inventory.update', $item) }}" method="POST">
-                                @csrf @method('PATCH')
-                                <select name="status" onchange="this.form.submit()" class="text-[10px] font-bold uppercase rounded-lg px-2 py-1 border-none cursor-pointer shadow-sm transition ring-1 ring-inset w-24
-                                        {{ $item->status == 'sold' ? 'bg-emerald-50 text-emerald-700 ring-emerald-600/20' : ($item->status == 'online' ? 'bg-indigo-50 text-indigo-700 ring-indigo-700/10' : 'bg-slate-50 text-slate-600 ring-slate-500/10') }}">
-                                    @if($view === 'archive')
-                                        <option value="sold" selected>Verkocht</option>
-                                        <option value="online">Zet terug</option>
-                                    @else
-                                        <option value="todo" {{ $item->status == 'todo' ? 'selected' : '' }}>To-do</option>
-                                        <option value="prep" {{ $item->status == 'prep' ? 'selected' : '' }}>Prep</option>
-                                        <option value="online" {{ $item->status == 'online' ? 'selected' : '' }}>Online</option>
-                                        <option value="sold">Verkocht</option>
-                                    @endif
-                                </select>
-                            </form>
-                        </div>
-
-                        <div class="flex justify-between items-center pt-3 border-t border-slate-100 gap-2">
-                            <div>
-                                @if(!empty($item->qc_photos))
-                                    <button @click="openQc({{ Js::from($item->qc_photos) }}, {{ Js::from($item) }})" class="text-[10px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100 hover:bg-purple-100 transition flex items-center gap-1">
-                                        <i class="fa-solid fa-camera"></i> QC
+                                <div class="relative" x-data="{ open: false }">
+                                    <button @click="open = !open" @click.outside="open = false" class="w-full h-full bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 hover:text-slate-700 rounded-lg text-xs font-bold transition flex items-center justify-center">
+                                        <i class="fa-solid fa-ellipsis text-sm"></i>
                                     </button>
-                                @endif
+                                    
+                                    <div x-show="open" class="absolute bottom-full right-0 mb-2 w-36 bg-white rounded-xl shadow-xl border border-slate-100 p-1 z-20 origin-bottom-right" style="display: none;">
+                                        @if(!empty($item->qc_photos))
+                                            <button @click="openQc({{ Js::from($item->qc_photos) }}, {{ Js::from($item) }}); open=false" class="w-full text-left px-3 py-2 text-xs font-bold text-purple-600 hover:bg-purple-50 rounded-lg flex items-center gap-2">
+                                                <i class="fa-solid fa-camera"></i> QC Foto's
+                                            </button>
+                                        @endif
+                                        <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
+                                            @csrf @method('DELETE')
+                                            <button class="w-full text-left px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-2">
+                                                <i class="fa-solid fa-trash"></i> Verwijder
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex gap-2">
-                                <button @click="openEdit({{ Js::from($item) }})" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Bewerk</button>
-                                <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
-                                    @csrf @method('DELETE')
-                                    <button class="text-red-500 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg text-xs font-bold transition">Verwijder</button>
-                                </form>
+                        @else
+                            <!-- Sold State Toolbar -->
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="bg-emerald-50 text-emerald-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-emerald-100">
+                                    <i class="fa-solid fa-check-circle"></i> VERKOCHT
+                                </div>
+                                <div class="flex gap-1">
+                                    <button @click="openEdit({{ Js::from($item) }})" class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-lg text-xs transition flex items-center justify-center p-2">
+                                        <i class="fa-solid fa-pen text-sm"></i>
+                                    </button>
+                                    <form action="{{ route('inventory.destroy', $item) }}" method="POST" class="flex-1" onsubmit="return confirm('Zeker weten?')">
+                                            @csrf @method('DELETE')
+                                        <button class="w-full h-full bg-white border border-slate-200 hover:bg-red-50 text-slate-400 hover:text-red-500 rounded-lg text-xs transition flex items-center justify-center p-2">
+                                            <i class="fa-solid fa-trash text-sm"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </div>
-                        </div>
+                        @endif
                     </div>
                 </div>
             @empty
-                <div class="col-span-full text-center py-12 text-slate-400 italic">Geen items gevonden.</div>
+                <div class="col-span-full flex flex-col items-center justify-center py-24 text-slate-400">
+                    <div class="bg-slate-50 p-6 rounded-full mb-4">
+                        <i class="fa-solid fa-box-open text-4xl text-slate-300"></i>
+                    </div>
+                    <p class="font-medium">Geen items gevonden.</p>
+                </div>
             @endforelse
         </div>
 
@@ -644,24 +772,38 @@
         </div>
 
         <div x-show="showSellModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="showSellModal = false">
-             <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm m-4">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-heading font-bold text-xl text-emerald-700">Money Time! 🤑</h3>
-                    <button @click="showSellModal = false" class="text-slate-400 hover:text-slate-600">✕</button>
+             <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm m-4 transform transition-all scale-100">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-emerald-100 p-2 rounded-full">
+                            <i class="fa-solid fa-hand-holding-dollar text-emerald-600 text-xl"></i>
+                        </div>
+                        <h3 class="font-heading font-bold text-xl text-slate-800">Verkocht!</h3>
+                    </div>
+                    <button @click="showSellModal = false" class="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition">✕</button>
                 </div>
-                <p class="text-slate-500 text-sm mb-4">Je staat op het punt <strong x-text="sellingItem.name"></strong> als verkocht te markeren.</p>
+                
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
+                    <p class="text-slate-600 text-sm font-medium">Item:</p>
+                    <p class="text-slate-900 font-bold text-lg leading-tight" x-text="sellingItem.name"></p>
+                </div>
+
                 <form :action="'/inventory/' + sellingItem.id + '/sold'" method="POST">
                     @csrf
                     <div class="space-y-4">
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Verkoopprijs (€)*</label>
-                            <input type="number" step="0.01" name="sell_price" required x-model="sellingItem.sell_price" class="w-full p-3 rounded-xl border-emerald-200 mt-1 focus:ring-emerald-500 focus:border-emerald-500 font-bold text-lg text-emerald-800 bg-emerald-50" placeholder="0.00" autofocus>
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Voor hoeveel is het verkocht?</label>
+                            <div class="relative mt-1">
+                                <span class="absolute left-4 top-3.5 text-emerald-600 font-bold text-lg">€</span>
+                                <input type="number" step="0.01" name="sell_price" required x-model="sellingItem.sell_price" 
+                                class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 font-bold text-xl text-slate-800 shadow-sm transition" placeholder="0.00" autofocus>
+                            </div>
                         </div>
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Verkoopdatum</label>
-                            <input type="date" name="sold_date" x-model="sellingItem.sold_date" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Wanneer?</label>
+                            <input type="date" name="sold_date" x-model="sellingItem.sold_date" class="w-full p-3 rounded-xl border-slate-200 mt-1 focus:ring-indigo-500 focus:border-indigo-500 font-bold text-slate-700">
                         </div>
-                        <button class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg mt-2 flex justify-center items-center gap-2">
+                        <button class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition shadow-xl shadow-slate-200 mt-4 flex justify-center items-center gap-2 transform active:scale-[0.98]">
                            <i class="fa-solid fa-check"></i> Bevestigen
                         </button>
                     </div>
@@ -749,6 +891,26 @@
                         <button class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition shadow-lg mt-2">Opslaan</button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- Image Lightbox Modal -->
+        <div x-show="showImageModal" 
+             style="display: none;" 
+             class="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0"
+             x-transition:enter-end="opacity-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0">
+            
+            <div class="relative w-full max-w-5xl h-full flex flex-col items-center justify-center" @click.outside="showImageModal = false">
+                <button @click="showImageModal = false" class="absolute top-0 right-0 z-50 p-4 text-white hover:text-gray-300 transition">
+                    <svg class="w-10 h-10 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+                
+                <img :src="activeImageUrl" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl ring-1 ring-white/10" @click.stop>
             </div>
         </div>
 
