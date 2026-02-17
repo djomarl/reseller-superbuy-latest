@@ -66,7 +66,9 @@ class InventoryController extends Controller
         $items = $query->with('parcel')->orderBy('sort_order', 'desc')->latest()->paginate(24)->withQueryString();
 
         // Data voor de filters en dropdowns
-        $categories = Item::where('user_id', $userId)->whereNotNull('category')->distinct()->pluck('category')->sort();
+        $dbCategories = Item::where('user_id', $userId)->whereNotNull('category')->distinct()->pluck('category')->toArray();
+        $staticCategories = \App\Models\Category::all();
+        $categories = collect(array_merge($dbCategories, $staticCategories))->unique()->sort()->values();
         $brands = Item::where('user_id', $userId)->whereNotNull('brand')->distinct()->pluck('brand')->sort();
         $parcels = Parcel::where('user_id', $userId)->latest()->get();
         $templates = ItemTemplate::where('user_id', $userId)->get();

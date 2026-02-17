@@ -194,6 +194,21 @@
                                         const brandEl = el.querySelector('.js-item-brand');
                                         if(brandEl) brandEl.textContent = item.brand || 'Onbekend';
 
+                                        // Category
+                                        const categoryEl = el.querySelector('.js-item-category');
+                                        if(categoryEl) {
+                                             // Preserve the icon if possible, or just update text. 
+                                             // Simpler to just update the text node if it's mixed, but let's try to keep the icon.
+                                             // The structure is <i></i> Text.
+                                             // valid approach: categoryEl.innerHTML = `<i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> ${item.category || 'Overige'}`;
+                                             // Check if it's the card view version (no icon inside the span directly, simplified) or table view
+                                             if (categoryEl.querySelector('i')) {
+                                                 categoryEl.innerHTML = `<i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> ${item.category || 'Overige'}`;
+                                             } else {
+                                                 categoryEl.textContent = item.category || 'Overige';
+                                             }
+                                        }
+
                                         // Size
                                         const sizeEl = el.querySelector('.js-item-size');
                                         if(sizeEl) {
@@ -640,7 +655,7 @@
                                         </div>
                                         
                                         <div class="flex flex-wrap gap-2">
-                                            <span class="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+                                            <span class="js-item-category inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
                                                 <i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> {{ $item->category ?? 'Overige' }}
                                             </span>
                                             @if($item->order_nmr)
@@ -826,7 +841,7 @@
                         <h3 class="js-item-name font-bold text-slate-900 leading-tight mb-2 line-clamp-2 min-h-[2.5rem]" title="{{ $item->name }}">{{ $item->name }}</h3>
                         
                         <div class="flex items-center gap-2 mb-4">
-                            <span class="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-100 truncate max-w-[100px]">{{ $item->category ?? 'Overige' }}</span>
+                            <span class="js-item-category text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-100 truncate max-w-[100px]">{{ $item->category ?? 'Overige' }}</span>
                             @if($item->order_nmr)
                                 <span class="text-[10px] font-mono text-blue-500 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 truncate" title="Order #{{ $item->order_nmr }}">#{{ $item->order_nmr }}</span>
                             @endif
@@ -1025,6 +1040,15 @@
                                     <label class="block text-sm font-medium text-slate-700">Maat</label>
                                     <input type="text" name="size" x-model="editingItem.size" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Categorie</label>
+                                <select name="category" x-model="editingItem.category" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <option value="">Selecteer Categorie</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat }}">{{ $cat }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
