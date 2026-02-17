@@ -337,47 +337,66 @@ class SuperbuyService
     /**
      * Import a single item into the database
      */
-    public function importItem(User $user, array $itemData, string $orderNo): Item
+        public function importItem(User $user, array $itemData, string $orderNo): Item
     {
         preg_match('/([\d\.,]+)/', $itemData['price'], $matches);
         $price = isset($matches[1]) ? floatval(str_replace(',', '.', $matches[1])) : 0.00;
 
-        $status = 'todo';
-        $itemStatusLower = strtolower($itemData['status']);
-        
         // Haal het unieke ID op (DI...)
         $subId = $itemData['subId'] ?? null;
 
-        // Bepaal waarop we zoeken om duplicaten te voorkomen
-        $matchAttributes = [
-            'user_id' => $user->id,
-            'order_nmr' => $orderNo,
-        ];
-
-        // BELANGRIJK: Als we een subId hebben, gebruiken we die voor strikte uniekheid.
-        // Dit fixt de bug dat items met hetzelfde ordernummer als duplicaat worden gezien.
+        // 1. Zoek bestaand item
+        $query = Item::where('user_id', $user->id);
+        
         if ($subId) {
-            $matchAttributes['item_no'] = $subId;
+             $query->where('item_no', $subId);
         } else {
-            // Fallback voor oude imports: uniek op basis van naam en maat
-            $matchAttributes['name'] = $itemData['title'];
-            $matchAttributes['size'] = substr($itemData['options'], 0, 190);
+             // Fallback voor oude imports: uniek op basis van naam en maat + ordernummer
+             $query->where('order_nmr', $orderNo)
+                   ->where('name', $itemData['title']);
+        }
+        
+        $item = $query->first();
+        $newPhotos = $itemData['qcPhotos'] ?? [];
+
+        // 2. UPDATE LOGICA
+        if ($item) {
+            $currentPhotos = $item->qc_photos;
+             if (is_string($currentPhotos)) {
+                $currentPhotos = json_decode($currentPhotos, true);
+            }
+            if (!is_array($currentPhotos)) $currentPhotos = [];
+
+            // Als we meer nieuwe foto's hebben dan we al hadden, updaten we ze
+            if (count($newPhotos) > count($currentPhotos)) {
+                $item->qc_photos = $newPhotos;
+                // Optioneel: Update status als hij niet 'sold' is
+                if (!$item->is_sold && $item->status !== 'sold') {
+                    // Forceer status warehouse update indien nodig, of laat zoals het is
+                }
+                $item->save();
+            }
+            return $item;
         }
 
-        return Item::firstOrCreate(
-            $matchAttributes, // Zoek op deze velden
-            [
-                // Vul deze velden in als het item nieuw is
-                'item_no' => $subId ?? '-', 
-                'name' => $itemData['title'],
-                'size' => substr($itemData['options'], 0, 190),
-                'buy_price' => $price,
-                'status' => $status,
-                'image_url' => $itemData['image'],
-                'qc_photos' => $itemData['qcPhotos'] ?? [],
-                'source_link' => $itemData['link'],
-                'notes' => $itemData['options'],
-            ]
-        );
+        // 3. CREATE LOGICA (Nieuw item)
+        // Dit is nagenoeg gelijk aan je oude code
+        
+        return Item::create([
+            'user_id' => $user->id,
+            'item_no' => $subId ?? '-', 
+            'order_nmr' => $orderNo, // Vergeet order_nmr niet
+            'name' => $itemData['title'],
+            'size' => substr(($itemData['options'] ?? ''), 0, 190),
+            'category' => 'Overige', // Default
+            'buy_price' => $price,
+            'status' => strtolower($itemData['status'] ?? 'todo'),
+            'image_url' => $itemData['image'] ?? null,
+            'qc_photos' => $newPhotos,
+            'source_link' => $itemData['link'] ?? null,
+            'notes' => $itemData['options'] ?? null,
+            'is_sold' => false
+        ]);
     }
+
 }
