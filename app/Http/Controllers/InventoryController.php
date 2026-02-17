@@ -249,10 +249,11 @@ class InventoryController extends Controller
         }
 
         $request->validate([
-            'action' => 'required|in:delete,set_status,set_parcel',
+            'action' => 'required|in:delete,set_status,set_parcel,set_category',
             'items' => 'required|array',
             'items.*' => 'exists:items,id',
             'status' => 'nullable|string',
+            'category' => 'nullable|string',
             'parcel_id' => 'nullable|exists:parcels,id',
         ]);
 
@@ -284,6 +285,11 @@ class InventoryController extends Controller
                     break;
                 case 'set_parcel':
                     $item->parcel_id = $request->parcel_id;
+                    $item->save();
+                    $count++;
+                    break;
+                case 'set_category':
+                    $item->category = $request->category;
                     $item->save();
                     $count++;
                     break;

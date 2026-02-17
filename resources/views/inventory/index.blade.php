@@ -552,6 +552,7 @@
                 <input type="hidden" name="action" id="bulkActionInput">
                 <input type="hidden" name="status" id="bulkStatusInput">
                 <input type="hidden" name="parcel_id" id="bulkParcelInput">
+                <input type="hidden" name="category" id="bulkCategoryInput">
 
                 <!-- Status Action -->
                 <div class="relative group">
@@ -566,6 +567,21 @@
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='online'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Online</button>
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='sold'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Verkocht</button>
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='personal'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Eigen Gebruik</button>
+                    </div>
+                </div>
+
+                <!-- Category Action -->
+                <div class="relative group">
+                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
+                        <i class="fa-solid fa-layer-group text-slate-400"></i> Categorie
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    </button>
+                    <div class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block max-h-60 overflow-y-auto">
+                        @foreach($categories as $cat)
+                             <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_category'; document.getElementById('bulkCategoryInput').value='{{ $cat }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                                {{ $cat }}
+                             </button>
+                        @endforeach
                     </div>
                 </div>
 

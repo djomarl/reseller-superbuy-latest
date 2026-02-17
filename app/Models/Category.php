@@ -10,6 +10,7 @@ class Category
             'Bag',
             'Shoes',
             'T-Shirt',
+            'Sweater',
             'Hoodie',
             'Jacket',
             'Hat',
