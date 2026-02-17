@@ -180,6 +180,11 @@ class InventoryController extends Controller
         }
 
         $inventory->save();
+        
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'item' => $inventory]);
+        }
+
         return redirect()->route('inventory.index')->with('success', 'Item bijgewerkt');
     }
 
