@@ -24,9 +24,14 @@ class InventoryController extends Controller
         $view = $request->get('view', 'active');
         
         if ($view === 'archive') {
-            $query->where('is_sold', true);
+            $query->where(function($q) {
+                $q->where('is_sold', true)
+                  ->orWhere('status', 'personal');
+            });
         } else {
-            $query->where('is_sold', false);
+            // Active view: not sold AND not personal
+            $query->where('is_sold', false)
+                  ->where('status', '!=', 'personal');
         }
 
         // 2. Zoeken (Naam, Merk, Item #, Order Nmr)
@@ -156,6 +161,9 @@ class InventoryController extends Controller
         if ($request->status == 'sold') {
             $inventory->is_sold = true;
             if (!$inventory->sold_date) $inventory->sold_date = now();
+        } elseif ($request->status == 'personal') {
+            $inventory->is_sold = false; // Personal items are not 'sold' in terms of revenue
+            $inventory->sold_date = null;
         } else {
             // Als je hem terugzet naar 'online' of 'todo', is hij niet meer verkocht
             // Tenzij we in de archief view zitten, maar meestal wil je dit resetten.
@@ -257,6 +265,9 @@ class InventoryController extends Controller
                     if ($request->status == 'sold') {
                         $item->is_sold = true;
                         $item->sold_date = $item->sold_date ?? now();
+                    } elseif ($request->status == 'personal') {
+                        $item->is_sold = false;
+                        $item->sold_date = null;
                     } else {
                         $item->is_sold = false;
                         $item->sold_date = null;

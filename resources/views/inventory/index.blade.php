@@ -240,6 +240,7 @@
                         <option value="todo" {{ request('status') == 'todo' ? 'selected' : '' }}>To-do</option>
                         <option value="online" {{ request('status') == 'online' ? 'selected' : '' }}>Online</option>
                         <option value="prep" {{ request('status') == 'prep' ? 'selected' : '' }}>Prep</option>
+                        <option value="personal" {{ request('status') == 'personal' ? 'selected' : '' }}>Eigen Gebruik</option>
                     </select>
                     @endif
 
@@ -296,6 +297,7 @@
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='prep'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Prep</button>
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='online'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Online</button>
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='sold'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Verkocht</button>
+                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='personal'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Eigen Gebruik</button>
                     </div>
                 </div>
 
@@ -404,16 +406,22 @@
                                         <select name="status" onchange="this.form.submit()" 
                                             class="appearance-none pl-3 pr-8 py-1.5 text-xs font-bold uppercase rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 transition shadow-sm w-32
                                             {{ $item->status == 'sold' ? 'bg-emerald-100 text-emerald-700 focus:ring-emerald-500' : 
-                                               ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700 focus:ring-indigo-500' : 
-                                               ($item->status == 'prep' ? 'bg-amber-100 text-amber-700 focus:ring-amber-500' : 
-                                               'bg-slate-100 text-slate-600 focus:ring-slate-500')) }}">
+                                               ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700 focus:ring-indigo-500' :                                                ($item->status == 'prep' ? 'bg-amber-100 text-amber-700 focus:ring-amber-500' : 
+                                                ($item->status == 'personal' ? 'bg-purple-100 text-purple-700 focus:ring-purple-500' :
+                                                'bg-slate-100 text-slate-600 focus:ring-slate-500'))) }}">
                                             @if($view === 'archive')
-                                                <option value="sold" selected>Verkocht</option>
-                                                <option value="online">Zet terug</option>
+                                                @if($item->status == 'personal')
+                                                    <option value="personal" selected>Eigen Gebruik</option>
+                                                    <option value="online">Zet terug</option>
+                                                @else
+                                                    <option value="sold" selected>Verkocht</option>
+                                                    <option value="online">Zet terug</option>
+                                                @endif
                                             @else
                                                 <option value="todo" {{ $item->status == 'todo' ? 'selected' : '' }}>To-do</option>
                                                 <option value="prep" {{ $item->status == 'prep' ? 'selected' : '' }}>Prep</option>
                                                 <option value="online" {{ $item->status == 'online' ? 'selected' : '' }}>Online</option>
+                                                <option value="personal" {{ $item->status == 'personal' ? 'selected' : '' }}>Eigen Gebruik</option>
                                                 <option value="sold">Markeer Verkocht</option>
                                             @endif
                                         </select>
@@ -540,6 +548,10 @@
                                 <span class="inline-flex items-center gap-1 bg-amber-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
                                     <i class="fa-solid fa-box-open"></i> Prep
                                 </span>
+                             @elseif($item->status == 'personal')
+                                <span class="inline-flex items-center gap-1 bg-purple-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
+                                    <i class="fa-solid fa-user"></i> Eigen
+                                </span>
                              @else
                                 <span class="inline-flex items-center gap-1 bg-slate-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
                                     <i class="fa-solid fa-list"></i> To-do
@@ -615,9 +627,15 @@
                         @else
                             <!-- Sold State Toolbar -->
                             <div class="grid grid-cols-2 gap-2">
-                                <div class="bg-emerald-50 text-emerald-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-emerald-100">
-                                    <i class="fa-solid fa-check-circle"></i> VERKOCHT
-                                </div>
+                                @if($item->status == 'personal')
+                                    <div class="bg-purple-50 text-purple-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-purple-100">
+                                        <i class="fa-solid fa-user"></i> EIGEN
+                                    </div>
+                                @else
+                                    <div class="bg-emerald-50 text-emerald-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-emerald-100">
+                                        <i class="fa-solid fa-check-circle"></i> VERKOCHT
+                                    </div>
+                                @endif
                                 <div class="flex gap-1">
                                     <button @click="openEdit({{ Js::from($item) }})" class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-lg text-xs transition flex items-center justify-center p-2">
                                         <i class="fa-solid fa-pen text-sm"></i>

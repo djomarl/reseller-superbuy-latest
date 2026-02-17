@@ -23,6 +23,7 @@ class DashboardController extends Controller
             
         $unsoldItems = Item::where('user_id', $userId)
             ->where('is_sold', false)
+            ->where('status', '!=', 'personal')
             ->with('parcel')
             ->get();
 
@@ -225,7 +226,10 @@ class DashboardController extends Controller
 
         // 1. Basis Data
         $soldItems = Item::where('user_id', $userId)->where('is_sold', true)->with('parcel.items')->latest('sold_date')->get();
-        $unsoldItems = Item::where('user_id', $userId)->where('is_sold', false)->get();
+        $unsoldItems = Item::where('user_id', $userId)
+            ->where('is_sold', false)
+            ->where('status', '!=', 'personal')
+            ->get();
         $parcels = Parcel::where('user_id', $userId)->get();
 
         // 2. Financiële Totalen
