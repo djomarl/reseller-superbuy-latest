@@ -123,10 +123,12 @@ class ExportController extends Controller
         // 2. Importeer items
         if (!empty($data['items'])) {
             foreach ($data['items'] as $itemData) {
-                // Check of item al bestaat op basis van item_no + order_nmr
+                // Check of item al bestaat op basis van item_no + order_nmr + name + size
                 $existing = Item::where('user_id', $user->id)
                     ->where('item_no', $itemData['item_no'])
                     ->where('order_nmr', $itemData['order_nmr'] ?? null)
+                    ->where('name', $itemData['name'] ?? null)
+                    ->where('size', $itemData['size'] ?? null)
                     ->first();
 
                 if ($existing) {
