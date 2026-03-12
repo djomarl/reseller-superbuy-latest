@@ -24,9 +24,14 @@ class InventoryController extends Controller
         $view = $request->get('view', 'active');
         
         if ($view === 'archive') {
-            $query->where('is_sold', true);
+            $query->where(function($q) {
+                $q->where('is_sold', true)
+                  ->orWhere('status', 'personal');
+            });
         } else {
-            $query->where('is_sold', false);
+            // Active view: not sold AND not personal
+            $query->where('is_sold', false)
+                  ->where('status', '!=', 'personal');
         }
 
         // 2. Zoeken (Naam, Merk, Item #, Order Nmr)
@@ -61,7 +66,9 @@ class InventoryController extends Controller
         $items = $query->with('parcel')->orderBy('sort_order', 'desc')->latest()->paginate(24)->withQueryString();
 
         // Data voor de filters en dropdowns
-        $categories = Item::where('user_id', $userId)->whereNotNull('category')->distinct()->pluck('category')->sort();
+        $dbCategories = Item::where('user_id', $userId)->whereNotNull('category')->distinct()->pluck('category')->toArray();
+        $staticCategories = \App\Models\Category::all();
+        $categories = collect(array_merge($dbCategories, $staticCategories))->unique()->sort()->values();
         $brands = Item::where('user_id', $userId)->whereNotNull('brand')->distinct()->pluck('brand')->sort();
         $parcels = Parcel::where('user_id', $userId)->latest()->get();
         $templates = ItemTemplate::where('user_id', $userId)->get();
@@ -156,6 +163,9 @@ class InventoryController extends Controller
         if ($request->status == 'sold') {
             $inventory->is_sold = true;
             if (!$inventory->sold_date) $inventory->sold_date = now();
+        } elseif ($request->status == 'personal') {
+            $inventory->is_sold = false; // Personal items are not 'sold' in terms of revenue
+            $inventory->sold_date = null;
         } else {
             // Als je hem terugzet naar 'online' of 'todo', is hij niet meer verkocht
             // Tenzij we in de archief view zitten, maar meestal wil je dit resetten.
@@ -172,6 +182,11 @@ class InventoryController extends Controller
         }
 
         $inventory->save();
+        
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'item' => $inventory]);
+        }
+
         return redirect()->route('inventory.index')->with('success', 'Item bijgewerkt');
     }
 
@@ -234,10 +249,11 @@ class InventoryController extends Controller
         }
 
         $request->validate([
-            'action' => 'required|in:delete,set_status,set_parcel',
+            'action' => 'required|in:delete,set_status,set_parcel,set_category',
             'items' => 'required|array',
             'items.*' => 'exists:items,id',
             'status' => 'nullable|string',
+            'category' => 'nullable|string',
             'parcel_id' => 'nullable|exists:parcels,id',
         ]);
 
@@ -257,6 +273,9 @@ class InventoryController extends Controller
                     if ($request->status == 'sold') {
                         $item->is_sold = true;
                         $item->sold_date = $item->sold_date ?? now();
+                    } elseif ($request->status == 'personal') {
+                        $item->is_sold = false;
+                        $item->sold_date = null;
                     } else {
                         $item->is_sold = false;
                         $item->sold_date = null;
@@ -266,6 +285,11 @@ class InventoryController extends Controller
                     break;
                 case 'set_parcel':
                     $item->parcel_id = $request->parcel_id;
+                    $item->save();
+                    $count++;
+                    break;
+                case 'set_category':
+                    $item->category = $request->category;
                     $item->save();
                     $count++;
                     break;

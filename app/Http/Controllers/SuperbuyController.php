@@ -95,7 +95,7 @@ class SuperbuyController extends Controller
     /**
      * Checkt welke items al in de database staan op basis van Unieke ID (DI...)
      */
-    public function checkExistingItems(Request $request)
+        public function checkExistingItems(Request $request)
     {
         $receivedSecret = $request->input('secret');
 
@@ -103,39 +103,54 @@ class SuperbuyController extends Controller
             return response()->json(['error' => 'Geen secret ontvangen.'], 401);
         }
 
-        $user = User::where('sync_secret', $receivedSecret)->first();
+        $user = \App\Models\User::where('sync_secret', $receivedSecret)->first();
 
         if (!$user) {
-            Log::warning("Superbuy Sync: Ongeldige secret geprobeerd (check): '{$receivedSecret}'");
+            \Illuminate\Support\Facades\Log::warning("Superbuy Sync: Ongeldige secret geprobeerd (check): '{$receivedSecret}'");
             return response()->json(['error' => 'Ongeldige Secret Key.'], 401);
         }
 
         $subIds = $request->input('sub_ids'); // De DI-nummers
         $orderNos = $request->input('order_nos'); // Fallback
 
-        $existing = [];
+        $query = \App\Models\Item::where('user_id', $user->id);
 
-        // 1. NIEUW: Check specifiek op item_no (waar we het DI-nummer opslaan)
         if ($subIds && is_array($subIds)) {
-            $existing = \App\Models\Item::where('user_id', $user->id)
-                        ->whereIn('item_no', $subIds)
-                        ->pluck('item_no')
-                        ->toArray();
+            $query->whereIn('item_no', $subIds);
+        } elseif ($orderNos && is_array($orderNos)) {
+             $query->whereIn('order_nmr', $orderNos);
         }
 
-        // 2. FALLBACK: Als er geen DI-matches zijn gevonden, kijk dan naar ordernummers
-        // (voor backward compatibility met items die je eerder hebt geïmporteerd zonder DI-nummer)
-        if (empty($existing) && $orderNos && is_array($orderNos)) {
-            $existing = \App\Models\Item::where('user_id', $user->id)
-                        ->whereIn('order_nmr', $orderNos)
-                        ->pluck('order_nmr')
-                        ->toArray();
+        // We halen nu ook de qc_photos kolom op
+        $items = $query->get(['item_no', 'order_nmr', 'qc_photos']);
+
+        $existing = [];
+        $existingDetails = [];
+
+        foreach ($items as $item) {
+            // Prefer SUB ID (item_no) as key, otherwise Order No
+            $key = ($item->item_no && $item->item_no !== '-') ? $item->item_no : $item->order_nmr;
+            $existing[] = $key;
+            
+            // Tel het aantal foto's (qc_photos is een array of JSON cast in je model)
+            $qcPhotos = $item->qc_photos;
+            // Zorg dat we zeker weten dat het een array is (afhankelijk van je casts)
+            if (is_string($qcPhotos)) {
+                $qcPhotos = json_decode($qcPhotos, true);
+            }
+            $qcCount = is_array($qcPhotos) ? count($qcPhotos) : 0;
+
+            $existingDetails[$key] = [
+                'qc_count' => $qcCount
+            ];
         }
 
         return response()->json([
-            'existing' => $existing
+            'existing' => $existing, // Legacy support voor oude extensie versies
+            'existing_details' => $existingDetails // Nieuwe support voor update logic
         ]);
     }
+
 
     public function import(Request $request)
     {

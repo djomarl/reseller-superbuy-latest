@@ -46,4 +46,19 @@ class Item extends Model
     {
         return $this->belongsTo(Parcel::class);
     }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_sold', false)->where('status', '!=', 'personal');
+    }
+
+    public function scopePersonal($query)
+    {
+        return $query->where('status', 'personal');
+    }
+
+    public function scopeSold($query)
+    {
+        return $query->where('is_sold', true);
+    }
 }

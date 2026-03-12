@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ExportController;
 use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\ParcelController;
 use App\Http\Controllers\PresetController;
@@ -52,6 +53,11 @@ Route::middleware(['auth', 'verified'])->group(function ()
 
     // Live Check Route
     Route::get('/inventory/status', [InventoryController::class, 'checkStatus'])->name('inventory.status');
+
+    // Export / Import
+    Route::get('/export', [ExportController::class, 'index'])->name('export.index');
+    Route::get('/export/download', [ExportController::class, 'export'])->name('export.download');
+    Route::post('/export/import', [ExportController::class, 'import'])->name('export.import');
     });
 
 require __DIR__ . '/auth.php';

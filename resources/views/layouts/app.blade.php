@@ -95,6 +95,15 @@
                                 </a>
                             </li>
                             <li>
+                                <a href="{{ route('export.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-bold transition {{ request()->routeIs('export*') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                        <path d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a2 2 0 002 2h14a2 2 0 002-2v-3" stroke-linecap="round" stroke-linejoin="round"/>
+                                        <path d="M21 7V5a2 2 0 00-2-2H5a2 2 0 00-2 2v2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    Export/Import
+                                </a>
+                            </li>
+                            <li>
                                 <a href="{{ route('profile.edit') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-bold transition {{ request()->routeIs('profile*') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100' }}">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -138,6 +147,7 @@
                                     'inventory.index' => 'Voorraad',
                                     'parcels.index' => 'Pakketten',
                                     'presets.index' => 'Presets',
+                                    'export.index' => 'Export/Import',
                                     'profile.edit' => 'Account',
                                 ] as $route => $label)
                                     <a href="{{ route($route) }}" class="inline-flex items-center px-1 pt-1 border-b-2 text-sm font-bold leading-5 transition duration-150 ease-in-out {{ request()->routeIs($route.'*') ? 'border-indigo-500 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-700' }}">

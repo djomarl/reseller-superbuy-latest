@@ -1,152 +1,415 @@
+<script>
+    window.inventoryTemplates = @json($templates);
+    window.inventoryItems = @json($items->items());
+</script>
+
 <x-app-layout>
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"
-         x-data="{
-            showImport: false,
-            showNew: false,
-            showEditModal: false,
-            showSellModal: false,
-            showQcModal: false,
-            viewMode: 'table',
-            selectedItems: [],
-            lastChecked: null,
-            showBulkActions: false,
-            editingItem: {},
-            sellingItem: {},
-            qcPhotos: [],
-            qcItem: null,
-            currentQcIndex: 0,
-            showImageModal: false,
-            activeImageUrl: null,
-            
-            // Hier laden we de templates in vanuit de controller
-            templates: {{ Js::from($templates) }},
+         x-data="inventoryManager"
+         x-init="$watch('selectedItems', value => showBulkActions = value.length > 0); $watch('viewMode', () => setTimeout(() => initSortable(), 50)); initSortable();">
+         
+         <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data('inventoryManager', () => ({
+                    showImport: false,
+                    showNew: false,
+                    showEditModal: false,
+                    showSellModal: false,
+                    showQcModal: false,
+                    viewMode: 'table',
+                    selectedItems: [],
+                    lastChecked: null,
+                    showBulkActions: false,
+                    editingItem: {},
+                    sellingItem: {},
+                    sellModalMode: 'sold',
+                    qcPhotos: [],
+                    qcItem: null,
+                    currentQcIndex: 0,
+                    showImageModal: false,
+                    activeImageUrl: null,
+                    templates: window.inventoryTemplates || [],
+                    itemsStore: {},
 
-            openImage(url) {
-                if(url) {
-                    this.activeImageUrl = url;
-                    this.showImageModal = true;
-                }
-            },
-            
-            toggleAll(event) {
-                if (event.target.checked) {
-                    this.selectedItems = Array.from(document.querySelectorAll('.item-checkbox')).map(cb => parseInt(cb.value));
-                    // Check all checkboxes in DOM manually to ensure visual sync
-                    document.querySelectorAll('.item-checkbox').forEach(el => el.checked = true);
-                } else {
-                    this.selectedItems = [];
-                    document.querySelectorAll('.item-checkbox').forEach(el => el.checked = false);
-                }
-            },
-            toggleItem(id, event) {
-                // Handle Shift-Click for range selection
-                if (event && event.shiftKey && this.lastChecked) {
-                    const checkboxes = Array.from(document.querySelectorAll('.item-checkbox'));
-                    const start = checkboxes.findIndex(cb => parseInt(cb.value) === this.lastChecked);
-                    const end = checkboxes.findIndex(cb => parseInt(cb.value) === id);
-                    
-                    const subset = checkboxes.slice(Math.min(start, end), Math.max(start, end) + 1);
-                    subset.forEach(cb => {
-                        const val = parseInt(cb.value);
-                        if (!this.selectedItems.includes(val)) {
-                            this.selectedItems.push(val);
-                            cb.checked = true;
+                    init() {
+                        if (window.inventoryItems) {
+                            window.inventoryItems.forEach(item => {
+                                this.itemsStore[item.id] = item;
+                            });
                         }
-                    });
-                } else {
-                    if (this.selectedItems.includes(id)) {
-                        this.selectedItems = this.selectedItems.filter(i => i !== id);
-                    } else {
-                        this.selectedItems.push(id);
-                    }
-                }
-                this.lastChecked = id;
-            },
-            toggleRow(id, event) {
-                // Prevent toggling if clicked on button or link or input inside row
-                if (event.target.tagName === 'BUTTON' || event.target.tagName === 'A' || event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' || event.target.closest('button') || event.target.closest('a') || event.target.closest('.drag-handle')) {
-                    return;
-                }
-                this.toggleItem(id, event);
-            },
-            applyPreset(event) {
-                const id = event.target.value;
-                const template = this.templates.find(t => t.id == id);
-                if (template) {
-                    // Vul de velden in het formulier (via ID's)
-                    document.getElementById('new_name').value = template.name || '';
-                    document.getElementById('new_brand').value = template.brand || '';
-                    document.getElementById('new_category').value = template.category || 'Overige';
-                    document.getElementById('new_size').value = template.size || '';
-                    document.getElementById('new_buy_price').value = template.default_buy_price || '';
-                    document.getElementById('new_sell_price').value = template.default_sell_price || '';
-                }
-            },
-            openEdit(item) {
-                this.editingItem = JSON.parse(JSON.stringify(item));
-                this.showEditModal = true;
-            },
-            openSell(item) {
-                this.sellingItem = JSON.parse(JSON.stringify(item));
-                if (!this.sellingItem.sold_date) {
-                    this.sellingItem.sold_date = new Date().toISOString().split('T')[0];
-                }
-                this.showSellModal = true;
-            },
-            openQc(photos, item) {
-                this.qcPhotos = photos || [];
-                this.qcItem = item || null;
-                this.currentQcIndex = 0;
-                this.showQcModal = true;
-            },
-            async setMainImage() {
-                if (!this.qcItem || this.qcPhotos.length === 0) return;
-                const imageUrl = this.qcPhotos[this.currentQcIndex];
+                    },
 
-                if(!confirm('Wil je deze foto instellen als hoofdafbeelding?')) return;
+                    openImage(url) {
+                        if(url) {
+                            this.activeImageUrl = url;
+                            this.showImageModal = true;
+                        }
+                    },
+                    
+                    toggleAll(event) {
+                        if (event.target.checked) {
+                            this.selectedItems = Array.from(document.querySelectorAll('.item-checkbox')).map(cb => parseInt(cb.value));
+                            document.querySelectorAll('.item-checkbox').forEach(el => el.checked = true);
+                        } else {
+                            this.selectedItems = [];
+                            document.querySelectorAll('.item-checkbox').forEach(el => el.checked = false);
+                        }
+                    },
 
-                try {
-                    const response = await fetch(`/inventory/${this.qcItem.id}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').getAttribute('content'),
-                            'Accept': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            _method: 'PATCH',
-                            image_url: imageUrl
-                        })
-                    });
-
-                    if (response.ok) {
-                        window.location.reload();
-                    } else {
-                        alert('Kon afbeelding niet instellen.');
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert('Er ging iets mis.');
-                }
-            },
-            initSortable() {
-                if(this.viewMode === 'table') {
-                    const el = document.querySelector('tbody#sortable-list');
-                    if(el) {
-                        Sortable.create(el, {
-                            handle: '.drag-handle',
-                            animation: 150,
-                            onEnd: function (evt) {
-                                // Logic to save order via API
-                                // Call a function to update order
-                                updateSortOrder(); 
+                    toggleItem(id, event) {
+                        if (event && event.shiftKey && this.lastChecked) {
+                            const checkboxes = Array.from(document.querySelectorAll('.item-checkbox'));
+                            const start = checkboxes.findIndex(cb => parseInt(cb.value) === this.lastChecked);
+                            const end = checkboxes.findIndex(cb => parseInt(cb.value) === id);
+                            
+                            const subset = checkboxes.slice(Math.min(start, end), Math.max(start, end) + 1);
+                            subset.forEach(cb => {
+                                const val = parseInt(cb.value);
+                                if (!this.selectedItems.includes(val)) {
+                                    this.selectedItems.push(val);
+                                    cb.checked = true;
+                                }
+                            });
+                        } else {
+                            if (this.selectedItems.includes(id)) {
+                                this.selectedItems = this.selectedItems.filter(i => i !== id);
+                            } else {
+                                this.selectedItems.push(id);
                             }
-                        });
+                        }
+                        this.lastChecked = id;
+                    },
+
+                    toggleRow(id, event) {
+                        if (event.target.tagName === 'BUTTON' || event.target.tagName === 'A' || event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' || event.target.closest('button') || event.target.closest('a') || event.target.closest('.drag-handle')) {
+                            return;
+                        }
+                        this.toggleItem(id, event);
+                    },
+
+                    applyPreset(event) {
+                        const id = event.target.value;
+                        const template = this.templates.find(t => t.id == id);
+                        if (template) {
+                            document.getElementById('new_name').value = template.name || '';
+                            document.getElementById('new_brand').value = template.brand || '';
+                            document.getElementById('new_category').value = template.category || 'Overige';
+                            document.getElementById('new_size').value = template.size || '';
+                            document.getElementById('new_buy_price').value = template.default_buy_price || '';
+                            document.getElementById('new_sell_price').value = template.default_sell_price || '';
+                        }
+                    },
+
+                    openEdit(item) {
+                        const storedItem = this.itemsStore[item.id] || item;
+                        this.editingItem = JSON.parse(JSON.stringify(storedItem));
+                        this.showEditModal = true;
+                    },
+
+                    openSell(item, mode = 'sold') {
+                        this.sellingItem = JSON.parse(JSON.stringify(item));
+                        this.sellModalMode = mode;
+                        if (mode === 'sold' && !this.sellingItem.sold_date) {
+                            this.sellingItem.sold_date = new Date().toISOString().split('T')[0];
+                        }
+                        this.showSellModal = true;
+                    },
+
+                    openQc(photos, item) {
+                        this.qcPhotos = photos || [];
+                        this.qcItem = item || null;
+                        this.currentQcIndex = 0;
+                        this.showQcModal = true;
+                    },
+
+                    async setMainImage() {
+                        if (!this.qcItem || this.qcPhotos.length === 0) return;
+                        const imageUrl = this.qcPhotos[this.currentQcIndex];
+
+                        if(!confirm('Wil je deze foto instellen als hoofdafbeelding?')) return;
+
+                        try {
+                            const response = await fetch(`/inventory/${this.qcItem.id}`, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').getAttribute('content'),
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    _method: 'PATCH',
+                                    image_url: imageUrl
+                                })
+                            });
+
+                            if (response.ok) {
+                                window.location.reload();
+                            } else {
+                                alert('Kon afbeelding niet instellen.');
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            alert('Er ging iets mis.');
+                        }
+                    },
+
+                    async submitEditModal(e) {
+                        // Only use AJAX in Kanban view; otherwise submit normally
+                        if (this.viewMode !== 'kanban') {
+                            e.target.submit();
+                            return;
+                        }
+
+                        const form = e.target;
+                        const formData = new FormData(form);
+                        formData.append('_method', 'PATCH');
+                        
+                        const id = this.editingItem.id;
+                        
+                        try {
+                            const res = await fetch(`/inventory/${id}`, {
+                                method: 'POST', 
+                                headers: {
+                                    'Accept': 'application/json',
+                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                                },
+                                body: formData
+                            });
+
+                            if (res.ok) {
+                                const data = await res.json();
+                                if(data.success) {
+                                    const item = data.item;
+                                    
+                                    // Update local store
+                                    this.itemsStore[id] = item;
+                                    
+                                    // DOM updates across all views (Table, Kanban, Cards)
+                                    document.querySelectorAll(`[data-id="${id}"]`).forEach(el => {
+                                        // Name
+                                        const nameEl = el.querySelector('.js-item-name');
+                                        if(nameEl) nameEl.textContent = item.name;
+
+                                        // Brand
+                                        const brandEl = el.querySelector('.js-item-brand');
+                                        if(brandEl) brandEl.textContent = item.brand || 'Onbekend';
+
+                                        // Category
+                                        const categoryEl = el.querySelector('.js-item-category');
+                                        if(categoryEl) {
+                                             // Preserve the icon if possible, or just update text. 
+                                             // Simpler to just update the text node if it's mixed, but let's try to keep the icon.
+                                             // The structure is <i></i> Text.
+                                             // valid approach: categoryEl.innerHTML = `<i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> ${item.category || 'Overige'}`;
+                                             // Check if it's the card view version (no icon inside the span directly, simplified) or table view
+                                             if (categoryEl.querySelector('i')) {
+                                                 categoryEl.innerHTML = `<i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> ${item.category || 'Overige'}`;
+                                             } else {
+                                                 categoryEl.textContent = item.category || 'Overige';
+                                             }
+                                        }
+
+                                        // Size
+                                        const sizeEl = el.querySelector('.js-item-size');
+                                        if(sizeEl) {
+                                            if(item.size) {
+                                                sizeEl.textContent = item.size;
+                                                sizeEl.style.display = '';
+                                            } else {
+                                                sizeEl.style.display = 'none';
+                                            }
+                                        }
+
+                                        // Sell Price
+                                        const sellEl = el.querySelector('.js-item-sell-price');
+                                        if(sellEl) {
+                                            // Format as currency
+                                            const formatted = parseFloat(item.sell_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                            sellEl.textContent = '€' + formatted;
+                                        }
+
+                                        // Buy Price
+                                        const buyEl = el.querySelector('.js-item-buy-price');
+                                        if(buyEl) {
+                                             const formatted = parseFloat(item.buy_price || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                             buyEl.textContent = '€' + formatted;
+                                        }
+
+                                        // Image
+                                        const imgEl = el.querySelector('.js-item-image');
+                                        if(imgEl && item.image_url) {
+                                            imgEl.src = item.image_url;
+                                        }
+                                    });
+
+                                    this.showEditModal = false;
+                                }
+                            } else {
+                                alert('Er ging iets mis bij het opslaan.');
+                            }
+                        } catch (error) {
+                            console.error(error);
+                            alert('Netwerkfout.');
+                        }
+                    },
+
+                    async submitSellModal() {
+                        if (!this.sellingItem) return;
+
+                        const id = this.sellingItem.id;
+                        const mode = this.sellModalMode;
+                        let url = `/inventory/${id}`;
+                        let method = 'PATCH';
+                        let body = {};
+
+                        if (mode === 'sold') {
+                            url = `/inventory/${id}/sold`;
+                            method = 'POST';
+                            body = {
+                                sell_price: this.sellingItem.sell_price,
+                                sold_date: this.sellingItem.sold_date,
+                                _token: document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            };
+                        } else {
+                            // Set price mode
+                            body = {
+                                _method: 'PATCH',
+                                status: 'online',
+                                sell_price: this.sellingItem.sell_price,
+                                _token: document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                            };
+                            method = 'POST'; // Laravel spoofing
+                        }
+
+                        try {
+                            const res = await fetch(url, {
+                                method: method,
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                    'Accept': 'application/json'
+                                },
+                                body: JSON.stringify(body)
+                            });
+
+                            if (res.ok) {
+                                const data = await res.json();
+                                // Update local store
+                                if(this.itemsStore[id]) {
+                                    this.itemsStore[id].sell_price = this.sellingItem.sell_price;
+                                    this.itemsStore[id].status = mode === 'sold' ? 'sold' : 'online';
+                                    if(mode === 'sold') this.itemsStore[id].sold_date = this.sellingItem.sold_date;
+                                }
+
+                                // Move item in DOM visually - SPECIFICALLY target the kanban item
+                                // We look for the element inside the kanban container to be safe, or use a specific class
+                                const itemEl = document.querySelector(`.kanban-item[data-id="${id}"]`);
+                                if (itemEl) {
+                                    const newStatus = mode === 'sold' ? 'sold' : 'online';
+                                    const targetList = document.getElementById(`kanban-${newStatus}`);
+                                    if (targetList) {
+                                        // Check if it's already there to avoid duplicates (though move should handle it)
+                                        targetList.insertBefore(itemEl, targetList.firstChild);
+                                    }
+                                    
+                                    // Update price text on card
+                                    const priceEl = itemEl.querySelector('.font-mono');
+                                    if(priceEl) priceEl.textContent = '€' + parseFloat(this.sellingItem.sell_price).toFixed(0);
+                                }
+
+                                this.showSellModal = false;
+                                this.sellingItem = {};
+                            } else {
+                                alert('Er ging iets mis bij het opslaan.');
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            alert('Netwerkfout.');
+                        }
+                    },
+
+                    initSortable() {
+                        if(this.viewMode === 'table') {
+                            const el = document.querySelector('tbody#sortable-list');
+                            if(el) {
+                                Sortable.create(el, {
+                                    handle: '.drag-handle',
+                                    animation: 150,
+                                    onEnd: function (evt) {
+                                        updateSortOrder(); 
+                                    }
+                                });
+                            }
+                        } else if(this.viewMode === 'kanban') {
+                             // Init Kanban Sortables
+                             ['todo', 'prep', 'online', 'sold'].forEach(status => {
+                                const el = document.getElementById('kanban-' + status);
+                                if(el) {
+                                    Sortable.create(el, {
+                                        group: 'kanban',
+                                        animation: 150,
+                                        ghostClass: 'bg-indigo-50',
+                                        onAdd: (evt) => {
+                                            const itemEl = evt.item;
+                                            const id = itemEl.getAttribute('data-id');
+                                            const itemData = this.itemsStore[id];
+                                            
+                                            if (!itemData) {
+                                                console.error('Item data not found for id:', id);
+                                                return;
+                                            }
+
+                                            const price = parseFloat(itemData.sell_price) || 0;
+                                            const newStatus = status;
+
+                                            // Intercept 'sold' status
+                                            if (newStatus === 'sold') {
+                                                evt.from.appendChild(itemEl); // Revert
+                                                this.openSell(itemData, 'sold');
+                                                return;
+                                            }
+
+                                            // Intercept 'online' status (Te Koop) IF price is 0
+                                            if (newStatus === 'online' && price <= 0) {
+                                                evt.from.appendChild(itemEl); // Revert
+                                                this.openSell(itemData, 'set_price');
+                                                return;
+                                            }
+                                            
+                                            // Update status via API normal flow
+                                            fetch('/inventory/' + id, {
+                                                method: 'POST', // Laravel method spoofing
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRF-TOKEN': document.querySelector('meta[name=\'csrf-token\']').getAttribute('content'),
+                                                    'Accept': 'application/json'
+                                                },
+                                                body: JSON.stringify({
+                                                    _method: 'PATCH',
+                                                    status: newStatus
+                                                })
+                                            }).then(res => res.json())
+                                              .then(data => {
+                                                  if(data.success) {
+                                                      // Optional: Show toast
+                                                      console.log('Status updated to ' + newStatus);
+                                                  } else {
+                                                      alert('Update mislukt');
+                                                      evt.from.appendChild(itemEl); // Revert
+                                                  }
+                                              }).catch(err => {
+                                                  console.error(err);
+                                                  alert('Er ging iets mis');
+                                                  evt.from.appendChild(itemEl); // Revert
+                                              });
+                                        }
+                                    });
+                                }
+                             });
+                        }
                     }
-                }
-            }
-         }"
-         x-init="$watch('selectedItems', value => showBulkActions = value.length > 0); initSortable();">
+                }));
+            });
+         </script>
          
          <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
          
@@ -195,6 +458,11 @@
                             :class="viewMode === 'cards' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
                             Cards
                         </button>
+                        <button type="button" @click="viewMode = 'kanban'"
+                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                            :class="viewMode === 'kanban' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                            Bord
+                        </button>
                     </div>
                     <a href="{{ route('superbuy.index') }}" class="px-4 py-2 bg-white border border-indigo-100 text-indigo-600 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-50 transition flex items-center">
                         <i class="fa-solid fa-layer-group mr-2"></i> Import Superbuy
@@ -240,6 +508,7 @@
                         <option value="todo" {{ request('status') == 'todo' ? 'selected' : '' }}>To-do</option>
                         <option value="online" {{ request('status') == 'online' ? 'selected' : '' }}>Online</option>
                         <option value="prep" {{ request('status') == 'prep' ? 'selected' : '' }}>Prep</option>
+                        <option value="personal" {{ request('status') == 'personal' ? 'selected' : '' }}>Eigen Gebruik</option>
                     </select>
                     @endif
 
@@ -283,6 +552,7 @@
                 <input type="hidden" name="action" id="bulkActionInput">
                 <input type="hidden" name="status" id="bulkStatusInput">
                 <input type="hidden" name="parcel_id" id="bulkParcelInput">
+                <input type="hidden" name="category" id="bulkCategoryInput">
 
                 <!-- Status Action -->
                 <div class="relative group">
@@ -296,6 +566,22 @@
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='prep'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Prep</button>
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='online'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Online</button>
                         <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='sold'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Verkocht</button>
+                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='personal'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Eigen Gebruik</button>
+                    </div>
+                </div>
+
+                <!-- Category Action -->
+                <div class="relative group">
+                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
+                        <i class="fa-solid fa-layer-group text-slate-400"></i> Categorie
+                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    </button>
+                    <div class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block max-h-60 overflow-y-auto">
+                        @foreach($categories as $cat)
+                             <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_category'; document.getElementById('bulkCategoryInput').value='{{ $cat }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                                {{ $cat }}
+                             </button>
+                        @endforeach
                     </div>
                 </div>
 
@@ -375,17 +661,17 @@
                                     </div>
                                     <div class="flex-1 min-w-0 py-1">
                                         <div class="flex items-center gap-2 mb-1">
-                                            <span class="text-[10px] font-extrabold tracking-wider text-slate-500 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
+                                            <span class="js-item-brand text-[10px] font-extrabold tracking-wider text-slate-500 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
                                             @if($item->size) 
-                                                <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span> 
+                                                <span class="js-item-size text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span> 
                                             @endif
                                         </div>
-                                        <div class="font-bold text-slate-800 text-sm leading-tight mb-1.5 hover:text-indigo-600 cursor-pointer line-clamp-1" @click.stop="openEdit({{ Js::from($item) }})">
+                                        <div class="js-item-name font-bold text-slate-800 text-sm leading-tight mb-1.5 hover:text-indigo-600 cursor-pointer line-clamp-1" @click.stop="openEdit({{ Js::from($item) }})">
                                             {{ $item->name }}
                                         </div>
                                         
                                         <div class="flex flex-wrap gap-2">
-                                            <span class="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+                                            <span class="js-item-category inline-flex items-center gap-1 text-[10px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
                                                 <i class="fa-solid fa-layer-group text-[9px] text-slate-400"></i> {{ $item->category ?? 'Overige' }}
                                             </span>
                                             @if($item->order_nmr)
@@ -404,16 +690,22 @@
                                         <select name="status" onchange="this.form.submit()" 
                                             class="appearance-none pl-3 pr-8 py-1.5 text-xs font-bold uppercase rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 transition shadow-sm w-32
                                             {{ $item->status == 'sold' ? 'bg-emerald-100 text-emerald-700 focus:ring-emerald-500' : 
-                                               ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700 focus:ring-indigo-500' : 
-                                               ($item->status == 'prep' ? 'bg-amber-100 text-amber-700 focus:ring-amber-500' : 
-                                               'bg-slate-100 text-slate-600 focus:ring-slate-500')) }}">
+                                               ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700 focus:ring-indigo-500' :                                                ($item->status == 'prep' ? 'bg-amber-100 text-amber-700 focus:ring-amber-500' : 
+                                                ($item->status == 'personal' ? 'bg-purple-100 text-purple-700 focus:ring-purple-500' :
+                                                'bg-slate-100 text-slate-600 focus:ring-slate-500'))) }}">
                                             @if($view === 'archive')
-                                                <option value="sold" selected>Verkocht</option>
-                                                <option value="online">Zet terug</option>
+                                                @if($item->status == 'personal')
+                                                    <option value="personal" selected>Eigen Gebruik</option>
+                                                    <option value="online">Zet terug</option>
+                                                @else
+                                                    <option value="sold" selected>Verkocht</option>
+                                                    <option value="online">Zet terug</option>
+                                                @endif
                                             @else
                                                 <option value="todo" {{ $item->status == 'todo' ? 'selected' : '' }}>To-do</option>
                                                 <option value="prep" {{ $item->status == 'prep' ? 'selected' : '' }}>Prep</option>
                                                 <option value="online" {{ $item->status == 'online' ? 'selected' : '' }}>Online</option>
+                                                <option value="personal" {{ $item->status == 'personal' ? 'selected' : '' }}>Eigen Gebruik</option>
                                                 <option value="sold">Markeer Verkocht</option>
                                             @endif
                                         </select>
@@ -450,13 +742,13 @@
                                 @endif
                             </td>
                             <td class="px-6 py-4 align-middle text-right">
-                                <div class="font-mono text-xs font-medium text-slate-500">
+                                <div class="js-item-buy-price font-mono text-xs font-medium text-slate-500">
                                     €{{ number_format($item->buy_price, 2) }}
                                 </div>
                             </td>
                             <td class="px-6 py-4 align-middle text-right">
                                 <div class="inline-block font-bold text-sm text-slate-800 bg-emerald-50/50 px-2 py-1 rounded border border-emerald-100/50">
-                                    @if($item->sell_price) €{{ number_format($item->sell_price, 2) }} @else <span class="text-slate-400">-</span> @endif
+                                    @if($item->sell_price) <span class="js-item-sell-price">€{{ number_format($item->sell_price, 2) }}</span> @else <span class="text-slate-400">-</span> @endif
                                 </div>
                             </td>
                             <td class="px-6 py-4 align-middle text-right">
@@ -499,13 +791,14 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" x-show="viewMode === 'cards'" x-cloak>
             @forelse($items as $item)
                 <div class="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:border-indigo-100 flex flex-col h-full overflow-hidden" 
+                     data-id="{{ $item->id }}"
                      :class="selectedItems.includes({{ $item->id }}) ? 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100' : ''">
                     
                     <!-- Image Section -->
                     <div class="relative aspect-square bg-slate-50 overflow-hidden cursor-zoom-in" @click="openImage('{{ $item->image_url }}')">
                         @if($item->image_url)
                             <img src="{{ $item->image_url }}" 
-                                 class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                                 class="js-item-image w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                                  referrerpolicy="no-referrer"
                                  loading="lazy">
                             <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-4">
@@ -540,6 +833,10 @@
                                 <span class="inline-flex items-center gap-1 bg-amber-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
                                     <i class="fa-solid fa-box-open"></i> Prep
                                 </span>
+                             @elseif($item->status == 'personal')
+                                <span class="inline-flex items-center gap-1 bg-purple-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
+                                    <i class="fa-solid fa-user"></i> Eigen
+                                </span>
                              @else
                                 <span class="inline-flex items-center gap-1 bg-slate-500/90 backdrop-blur text-white text-[10px] uppercase font-bold px-2 py-1 rounded-lg shadow-sm">
                                     <i class="fa-solid fa-list"></i> To-do
@@ -551,16 +848,16 @@
                     <!-- Content Section -->
                     <div class="p-4 flex flex-col flex-1">
                         <div class="mb-1 flex justify-between items-start">
-                            <span class="text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
+                            <span class="js-item-brand text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
                             @if($item->size)
-                                <span class="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span>
+                                <span class="js-item-size text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span>
                             @endif
                         </div>
                         
-                        <h3 class="font-bold text-slate-900 leading-tight mb-2 line-clamp-2 min-h-[2.5rem]" title="{{ $item->name }}">{{ $item->name }}</h3>
+                        <h3 class="js-item-name font-bold text-slate-900 leading-tight mb-2 line-clamp-2 min-h-[2.5rem]" title="{{ $item->name }}">{{ $item->name }}</h3>
                         
                         <div class="flex items-center gap-2 mb-4">
-                            <span class="text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-100 truncate max-w-[100px]">{{ $item->category ?? 'Overige' }}</span>
+                            <span class="js-item-category text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-100 truncate max-w-[100px]">{{ $item->category ?? 'Overige' }}</span>
                             @if($item->order_nmr)
                                 <span class="text-[10px] font-mono text-blue-500 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 truncate" title="Order #{{ $item->order_nmr }}">#{{ $item->order_nmr }}</span>
                             @endif
@@ -615,9 +912,15 @@
                         @else
                             <!-- Sold State Toolbar -->
                             <div class="grid grid-cols-2 gap-2">
-                                <div class="bg-emerald-50 text-emerald-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-emerald-100">
-                                    <i class="fa-solid fa-check-circle"></i> VERKOCHT
-                                </div>
+                                @if($item->status == 'personal')
+                                    <div class="bg-purple-50 text-purple-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-purple-100">
+                                        <i class="fa-solid fa-user"></i> EIGEN
+                                    </div>
+                                @else
+                                    <div class="bg-emerald-50 text-emerald-700 rounded-lg py-1.5 text-xs font-bold flex items-center justify-center gap-1 border border-emerald-100">
+                                        <i class="fa-solid fa-check-circle"></i> VERKOCHT
+                                    </div>
+                                @endif
                                 <div class="flex gap-1">
                                     <button @click="openEdit({{ Js::from($item) }})" class="flex-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-400 hover:text-indigo-600 rounded-lg text-xs transition flex items-center justify-center p-2">
                                         <i class="fa-solid fa-pen text-sm"></i>
@@ -643,6 +946,83 @@
             @endforelse
         </div>
 
+
+
+        <!-- Kanban View -->
+        <div class="flex overflow-x-auto gap-6 pb-8 px-6" x-show="viewMode === 'kanban'" x-cloak>
+            @php
+                $configs = [
+                    'todo' => ['label' => 'Warehouse', 'color' => 'slate', 'icon' => 'fa-warehouse'],
+                    'prep' => ['label' => 'Shipped', 'color' => 'amber', 'icon' => 'fa-box-open'],
+                    'online' => ['label' => 'Te Koop', 'color' => 'indigo', 'icon' => 'fa-globe'],
+                    'sold' => ['label' => 'Verkocht', 'color' => 'emerald', 'icon' => 'fa-check-circle'],
+                ];
+            @endphp
+            @foreach($configs as $status => $config)
+                <div class="flex-shrink-0 w-80 flex flex-col h-full rounded-2xl bg-{{ $config['color'] }}-50/50 border border-{{ $config['color'] }}-100/50">
+                    <!-- Column Header -->
+                    <div class="p-4 flex items-center justify-between border-b border-{{ $config['color'] }}-100/50">
+                        <div class="flex items-center gap-2">
+                            <div class="w-8 h-8 rounded-lg bg-white shadow-sm text-{{ $config['color'] }}-600 flex items-center justify-center">
+                                <i class="fa-solid {{ $config['icon'] }}"></i>
+                            </div>
+                            <h3 class="font-bold text-slate-800">{{ $config['label'] }}</h3>
+                        </div>
+                        <span class="text-xs font-bold bg-white px-2 py-1 rounded-md text-slate-500 shadow-sm">
+                            {{ $items->where('status', $status)->count() }}
+                        </span>
+                    </div>
+
+                    <!-- Column Content -->
+                    <div id="kanban-{{ $status }}" class="p-3 flex-1 overflow-y-auto min-h-[500px]" data-status="{{ $status }}">
+                        @foreach($items as $item)
+                            @if($item->status == $status)
+                                <div class="kanban-item bg-white p-3 rounded-xl shadow-sm border border-slate-100 mb-3 cursor-grab hover:shadow-md transition-shadow group relative" 
+                                     data-id="{{ $item->id }}">
+                                    
+                                    <div class="flex gap-3">
+                                        <!-- Mini Image -->
+                                        <div class="w-12 h-12 rounded-lg bg-slate-50 flex-shrink-0 overflow-hidden border border-slate-100">
+                                            @if($item->image_url)
+                                                <img src="{{ $item->image_url }}" class="w-full h-full object-cover">
+                                            @else
+                                                <div class="w-full h-full flex items-center justify-center text-slate-300">
+                                                    <i class="fa-solid fa-image text-xs"></i>
+                                                </div>
+                                            @endif
+                                        </div>
+
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex justify-between items-start mb-0.5">
+                                                <span class="js-item-brand text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{{ $item->brand }}</span>
+                                                @if($item->size)
+                                                    <span class="js-item-size text-[9px] font-bold bg-slate-100 px-1 rounded text-slate-500">{{ $item->size }}</span>
+                                                @endif
+                                            </div>
+                                            <div class="js-item-name font-bold text-xs text-slate-800 leading-tight mb-1 line-clamp-2">{{ $item->name }}</div>
+                                            <div class="flex justify-between items-center">
+                                                <span class="js-item-sell-price font-mono text-xs font-bold text-slate-600">€{{ number_format($item->sell_price, 0) }}</span>
+                                                <button @click.stop="openEdit({{ Js::from($item) }})" class="text-slate-300 hover:text-indigo-600 transition">
+                                                    <i class="fa-solid fa-pen text-xs"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endif
+                        @endforeach
+                        
+                        <!-- Dient als dropzone target ook al is hij leeg -->
+                        <div class="h-10 border-2 border-dashed border-{{ $config['color'] }}-200/50 rounded-xl flex items-center justify-center text-{{ $config['color'] }}-300 text-xs font-medium opacity-50">
+                            Drop hier
+                        </div>
+                    </div>
+                </div>
+            @endforeach
+            <!-- Spacer for visual cutoff fix -->
+            <div class="w-1 flex-shrink-0"></div>
+        </div>
+
         <div class="mt-6">
             {{ $items->links() }}
         </div>
@@ -653,7 +1033,7 @@
                 <div x-show="showEditModal" @click="showEditModal = false" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
                 <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-6" enctype="multipart/form-data">
+                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-6" enctype="multipart/form-data" @submit.prevent="submitEditModal">
                         @csrf @method('PATCH')
                         <div class="mb-5 flex justify-between items-center">
                             <h3 class="text-lg leading-6 font-bold text-gray-900" id="modal-title">Snel Bewerken</h3>
@@ -676,6 +1056,15 @@
                                     <label class="block text-sm font-medium text-slate-700">Maat</label>
                                     <input type="text" name="size" x-model="editingItem.size" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
                                 </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700">Categorie</label>
+                                <select name="category" x-model="editingItem.category" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <option value="">Selecteer Categorie</option>
+                                    @foreach($categories as $cat)
+                                        <option value="{{ $cat }}">{{ $cat }}</option>
+                                    @endforeach
+                                </select>
                             </div>
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
@@ -778,7 +1167,7 @@
                         <div class="bg-emerald-100 p-2 rounded-full">
                             <i class="fa-solid fa-hand-holding-dollar text-emerald-600 text-xl"></i>
                         </div>
-                        <h3 class="font-heading font-bold text-xl text-slate-800">Verkocht!</h3>
+                        <h3 class="font-heading font-bold text-xl text-slate-800" x-text="sellModalMode === 'sold' ? 'Verkocht!' : 'Prijs Instellen'">Verkocht!</h3>
                     </div>
                     <button @click="showSellModal = false" class="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition">✕</button>
                 </div>
@@ -788,23 +1177,22 @@
                     <p class="text-slate-900 font-bold text-lg leading-tight" x-text="sellingItem.name"></p>
                 </div>
 
-                <form :action="'/inventory/' + sellingItem.id + '/sold'" method="POST">
-                    @csrf
+                <form @submit.prevent="submitSellModal">
                     <div class="space-y-4">
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Voor hoeveel is het verkocht?</label>
+                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide" x-text="sellModalMode === 'sold' ? 'Voor hoeveel is het verkocht?' : 'Verkoopprijs Instellen'"></label>
                             <div class="relative mt-1">
                                 <span class="absolute left-4 top-3.5 text-emerald-600 font-bold text-lg">€</span>
                                 <input type="number" step="0.01" name="sell_price" required x-model="sellingItem.sell_price" 
                                 class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 font-bold text-xl text-slate-800 shadow-sm transition" placeholder="0.00" autofocus>
                             </div>
                         </div>
-                        <div>
+                        <div x-show="sellModalMode === 'sold'">
                             <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Wanneer?</label>
                             <input type="date" name="sold_date" x-model="sellingItem.sold_date" class="w-full p-3 rounded-xl border-slate-200 mt-1 focus:ring-indigo-500 focus:border-indigo-500 font-bold text-slate-700">
                         </div>
-                        <button class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition shadow-xl shadow-slate-200 mt-4 flex justify-center items-center gap-2 transform active:scale-[0.98]">
-                           <i class="fa-solid fa-check"></i> Bevestigen
+                        <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition shadow-xl shadow-slate-200 mt-4 flex justify-center items-center gap-2 transform active:scale-[0.98]">
+                           <i class="fa-solid fa-check"></i> <span x-text="sellModalMode === 'sold' ? 'Bevestigen' : 'Prijs Opslaan'"></span>
                         </button>
                     </div>
                 </form>

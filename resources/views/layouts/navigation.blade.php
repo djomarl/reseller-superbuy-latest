@@ -18,6 +18,9 @@
                     <x-nav-link :href="route('inventory.index')" :active="request()->routeIs('inventory.*') && !request()->routeIs('inventory.archive')">
                         {{ __('Voorraad') }}
                     </x-nav-link>
+                    <x-nav-link :href="route('export.index')" :active="request()->routeIs('export.*')">
+                        {{ __('Export/Import') }}
+                    </x-nav-link>
                     <x-nav-link :href="route('profile.edit')" :active="request()->routeIs('profile.edit')">
                         {{ __('Account') }}
                     </x-nav-link>
@@ -78,6 +81,9 @@
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('inventory.index')" :active="request()->routeIs('inventory.*') && !request()->routeIs('inventory.archive')">
                 {{ __('Voorraad') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('export.index')" :active="request()->routeIs('export.*')">
+                {{ __('Export/Import') }}
             </x-responsive-nav-link>
         </div>
 
