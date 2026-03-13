@@ -390,7 +390,7 @@ class SuperbuyService
             'size' => substr(($itemData['options'] ?? ''), 0, 190),
             'category' => 'Overige', // Default
             'buy_price' => $price,
-            'status' => strtolower($itemData['status'] ?? 'todo'),
+            'status' => 'todo',
             'image_url' => $itemData['image'] ?? null,
             'qc_photos' => $newPhotos,
             'source_link' => $itemData['link'] ?? null,

@@ -408,7 +408,7 @@ public function checkStatus()
                 'category' => $category,
                 'buy_price' => $price,
                 'is_sold' => false,
-                'status' => 'stock'
+                'status' => 'todo'
             ]);
             $count++;
         }
