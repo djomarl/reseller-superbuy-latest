@@ -561,12 +561,14 @@
                         <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
                     </button>
                     <!-- Dropdown -->
-                    <div class="absolute bottom-full left-0 mb-2 w-40 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block">
-                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='todo'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">To-do</button>
-                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='prep'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Prep</button>
-                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='online'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Online</button>
-                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='sold'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Verkocht</button>
-                        <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='personal'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Eigen Gebruik</button>
+                    <div class="absolute bottom-full left-0 pb-2 hidden group-hover:block z-50">
+                        <div class="w-40 bg-white rounded-xl shadow-xl border border-slate-100 p-1">
+                            <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='todo'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">To-do</button>
+                            <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='prep'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Prep</button>
+                            <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='online'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Online</button>
+                            <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='sold'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Verkocht</button>
+                            <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_status'; document.getElementById('bulkStatusInput').value='personal'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">Eigen Gebruik</button>
+                        </div>
                     </div>
                 </div>
 
@@ -576,12 +578,14 @@
                         <i class="fa-solid fa-layer-group text-slate-400"></i> Categorie
                         <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
                     </button>
-                    <div class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block max-h-60 overflow-y-auto">
-                        @foreach($categories as $cat)
-                             <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_category'; document.getElementById('bulkCategoryInput').value='{{ $cat }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
-                                {{ $cat }}
-                             </button>
-                        @endforeach
+                    <div class="absolute bottom-full left-0 pb-2 hidden group-hover:block z-50">
+                        <div class="w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 max-h-60 overflow-y-auto">
+                            @foreach($categories as $cat)
+                                 <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_category'; document.getElementById('bulkCategoryInput').value='{{ $cat }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                                    {{ $cat }}
+                                 </button>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
 
@@ -591,12 +595,14 @@
                         <i class="fa-solid fa-box text-slate-400"></i> Pakket
                         <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
                     </button>
-                    <div class="absolute bottom-full left-0 mb-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 hidden group-hover:block max-h-60 overflow-y-auto">
-                        @foreach($parcels as $p)
-                             <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_parcel'; document.getElementById('bulkParcelInput').value='{{ $p->id }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
-                                {{ $p->parcel_no }}
-                             </button>
-                        @endforeach
+                    <div class="absolute bottom-full left-0 pb-2 hidden group-hover:block z-50">
+                        <div class="w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 max-h-60 overflow-y-auto">
+                            @foreach($parcels as $p)
+                                 <button type="submit" onclick="document.getElementById('bulkActionInput').value='set_parcel'; document.getElementById('bulkParcelInput').value='{{ $p->id }}'" class="w-full text-left px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg">
+                                    {{ $p->parcel_no }}
+                                 </button>
+                            @endforeach
+                        </div>
                     </div>
                 </div>
 
