@@ -62,6 +62,18 @@ class InventoryController extends Controller
              $query->where('status', $request->status);
         }
 
+        // 6. Calculate Insights Data
+        $activeItems = Item::where('user_id', $userId)->where('is_sold', false)->where('status', '!=', 'personal');
+        $soldItems = Item::where('user_id', $userId)->where('is_sold', true);
+
+        $insights = [
+            'total_active' => $activeItems->count(),
+            'total_buy_value' => $activeItems->sum('buy_price'),
+            'total_sold' => $soldItems->count(),
+            'total_revenue' => $soldItems->sum('sell_price'),
+            'total_profit' => $soldItems->sum('sell_price') - $soldItems->sum('buy_price'),
+        ];
+
         // Data ophalen (met paginering voor de cards view)
         $items = $query->with('parcel')->orderBy('sort_order', 'desc')->latest()->paginate(24)->withQueryString();
 
@@ -73,7 +85,7 @@ class InventoryController extends Controller
         $parcels = Parcel::where('user_id', $userId)->latest()->get();
         $templates = ItemTemplate::where('user_id', $userId)->get();
 
-        return view('inventory.index', compact('items', 'categories', 'brands', 'parcels', 'templates', 'view'));
+        return view('inventory.index', compact('items', 'categories', 'brands', 'parcels', 'templates', 'view', 'insights'));
     }
 
     public function create()

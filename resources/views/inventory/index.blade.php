@@ -30,6 +30,28 @@
                     activeImageUrl: null,
                     templates: window.inventoryTemplates || [],
                     itemsStore: {},
+                    contextMenu: { show: false, x: 0, y: 0, item: null },
+
+                    openContextMenu(e, item) {
+                        e.preventDefault();
+                        this.contextMenu.item = item;
+                        this.contextMenu.show = true;
+                        
+                        // Basic positioning, keeping it fully inside viewport
+                        let x = e.clientX;
+                        let y = e.clientY;
+                        
+                        // Assume menu is ~200px wide and ~250px tall
+                        if (x + 200 > window.innerWidth) x = window.innerWidth - 220;
+                        if (y + 250 > window.innerHeight) y = window.innerHeight - 270;
+
+                        this.contextMenu.x = x;
+                        this.contextMenu.y = y;
+                    },
+
+                    closeContextMenu() {
+                        this.contextMenu.show = false;
+                    },
 
                     init() {
                         if (window.inventoryItems) {
@@ -429,16 +451,62 @@
             }
          </script>
 
-        @if(session('success'))
-            <div class="mb-6 bg-green-100 border border-green-200 text-green-700 px-4 py-3 rounded-xl relative shadow-sm">
-                <strong class="font-bold">Succes!</strong> {{ session('success') }}
+        <!-- Insights Banner (V2) -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 justify-between mb-8"
+             x-data="{
+                show: false
+             }"
+             x-init="setTimeout(() => show = true, 50)"
+             x-show="show" x-cloak
+             x-transition:enter="transition ease-out duration-500 delay-100"
+             x-transition:enter-start="opacity-0 -translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0">
+             
+            <!-- Active Items -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-boxes-stacked"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Actief</span>
+                </div>
+                <div class="text-2xl font-black text-slate-800 font-heading">{{ $insights['total_active'] }} <span class="text-sm text-slate-400 font-normal">items</span></div>
             </div>
-        @endif
-        @if(session('error'))
-            <div class="mb-6 bg-red-100 border border-red-200 text-red-700 px-4 py-3 rounded-xl relative shadow-sm">
-                <strong class="font-bold">Fout!</strong> {{ session('error') }}
+
+            <!-- Total Buy Value -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-money-bill-wave"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Inkoopwaarde</span>
+                </div>
+                <div class="text-2xl font-black text-slate-800 font-heading">€{{ number_format($insights['total_buy_value'], 2, ',', '.') }}</div>
             </div>
-        @endif
+
+            <!-- Items Sold -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                        <i class="fa-solid fa-tags"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Verkocht</span>
+                </div>
+                <div class="text-2xl font-black text-slate-800 font-heading">{{ $insights['total_sold'] }} <span class="text-sm text-slate-400 font-normal">items</span></div>
+            </div>
+
+            <!-- Total Profit -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
+                <div class="absolute -right-4 -top-4 w-20 h-20 bg-purple-400 rounded-full opacity-10 blur-xl group-hover:scale-150 transition-transform duration-700"></div>
+                <div class="flex items-center gap-3 mb-2">
+                    <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors z-10">
+                        <i class="fa-solid fa-chart-line"></i>
+                    </div>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest z-10">Totale Winst</span>
+                </div>
+                <div class="text-2xl font-black text-purple-600 font-heading z-10 relative">€{{ number_format($insights['total_profit'], 2, ',', '.') }}</div>
+            </div>
+        </div>
 
         <div class="flex flex-col gap-4 mb-8">
             <div class="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
@@ -447,69 +515,93 @@
                     <span class="text-slate-400 text-lg ml-2">({{ $items->total() }})</span>
                 </h2>
                 <div class="flex flex-wrap gap-2">
-                    <div class="flex bg-slate-100 p-1 rounded-xl">
+                    <div class="flex bg-white/50 backdrop-blur-md p-1 rounded-xl border border-slate-200/50 shadow-sm">
                         <button type="button" @click="viewMode = 'table'"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                            :class="viewMode === 'table' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                            class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300"
+                            :class="viewMode === 'table' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'">
                             Tabel
                         </button>
                         <button type="button" @click="viewMode = 'cards'"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                            :class="viewMode === 'cards' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                            class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300"
+                            :class="viewMode === 'cards' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'">
                             Cards
                         </button>
                         <button type="button" @click="viewMode = 'kanban'"
-                            class="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                            :class="viewMode === 'kanban' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'">
+                            class="px-4 py-1.5 rounded-lg text-sm font-bold transition-all duration-300"
+                            :class="viewMode === 'kanban' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-white/50'">
                             Bord
                         </button>
                     </div>
-                    <a href="{{ route('superbuy.index') }}" class="px-4 py-2 bg-white border border-indigo-100 text-indigo-600 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-50 transition flex items-center">
-                        <i class="fa-solid fa-layer-group mr-2"></i> Import Superbuy
+                    <a href="{{ route('superbuy.index') }}" class="px-5 py-2.5 bg-white border border-slate-200/60 text-indigo-600 rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 flex items-center">
+                        <i class="fa-solid fa-cloud-arrow-down mr-2 text-indigo-400"></i> Import Superbuy
                     </a>
-                    <button @click="showImport = true" class="px-4 py-2 bg-white border border-indigo-100 text-indigo-600 rounded-xl text-sm font-bold shadow-sm hover:bg-indigo-50 transition">
-                        Import
+                    <button @click="showImport = true" class="px-5 py-2.5 bg-white border border-slate-200/60 text-slate-600 rounded-xl text-sm font-bold shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-300">
+                        <i class="fa-solid fa-upload mr-1.5 opacity-50"></i> Import CSV
                     </button>
-                    <button @click="showNew = true" class="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition">
-                        + Nieuw
+                    <button @click="showNew = true" class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 hover:shadow-xl hover:shadow-indigo-300 hover:-translate-y-0.5 transition-all duration-300">
+                        <i class="fa-solid fa-plus mr-1.5"></i> Nieuw
                     </button>
                 </div>
             </div>
 
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col lg:flex-row gap-4 justify-between items-center">
-                <form method="GET" action="{{ route('inventory.index') }}" class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto flex-1">
+            <div class="glass-card p-5 rounded-2xl flex flex-col lg:flex-row gap-4 justify-between items-center mb-8">
+                <form method="GET" action="{{ route('inventory.index') }}" class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto flex-1">
                     <input type="hidden" name="view" value="{{ $view }}">
 
-                    <div class="relative w-full sm:w-64">
-                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Zoek op naam, merk..."
-                            class="w-full pl-10 pr-4 py-2 rounded-xl border-slate-200 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <div class="absolute left-3 top-2.5 text-slate-400">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <div class="relative w-full sm:w-72">
+                        <input type="text" name="search" value="{{ request('search') }}" placeholder="Zoek op naam, merk, of id..."
+                            class="w-full pl-11 pr-4 py-2.5 rounded-xl border-slate-200/60 bg-white/60 text-sm focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium placeholder-slate-400 shadow-sm">
+                        <div class="absolute left-4 top-3 text-indigo-400">
+                            <i class="fa-solid fa-magnifying-glass"></i>
                         </div>
                     </div>
 
-                    <select name="category" onchange="this.form.submit()" class="w-full sm:w-40 py-2 rounded-xl border-slate-200 text-sm cursor-pointer">
-                        <option value="">Alle Categorieën</option>
-                        @foreach($categories as $cat)
-                            <option value="{{ $cat }}" {{ request('category') == $cat ? 'selected' : '' }}>{{ $cat }}</option>
-                        @endforeach
-                    </select>
+                    <div class="relative sm:w-48">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-filter text-slate-400 text-xs"></i>
+                        </div>
+                        <select name="category" onchange="this.form.submit()" class="w-full pl-9 pr-8 py-2.5 rounded-xl border-slate-200/60 bg-white/60 text-sm font-medium focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition-all shadow-sm appearance-none">
+                            <option value="">Alle Categorieën</option>
+                            @foreach($categories as $cat)
+                                <option value="{{ $cat }}" {{ request('category') == $cat ? 'selected' : '' }}>{{ $cat }}</option>
+                            @endforeach
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
 
-                    <select name="brand" onchange="this.form.submit()" class="w-full sm:w-40 py-2 rounded-xl border-slate-200 text-sm cursor-pointer">
-                        <option value="">Alle Merken</option>
-                        @foreach($brands as $brand)
-                            <option value="{{ $brand }}" {{ request('brand') == $brand ? 'selected' : '' }}>{{ $brand }}</option>
-                        @endforeach
-                    </select>
+                    <div class="relative sm:w-48">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-tag text-slate-400 text-xs"></i>
+                        </div>
+                        <select name="brand" onchange="this.form.submit()" class="w-full pl-9 pr-8 py-2.5 rounded-xl border-slate-200/60 bg-white/60 text-sm font-medium focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition-all shadow-sm appearance-none">
+                            <option value="">Alle Merken</option>
+                            @foreach($brands as $brand)
+                                <option value="{{ $brand }}" {{ request('brand') == $brand ? 'selected' : '' }}>{{ $brand }}</option>
+                            @endforeach
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
 
                     @if($view !== 'archive')
-                    <select name="status" onchange="this.form.submit()" class="w-full sm:w-40 py-2 rounded-xl border-slate-200 text-sm cursor-pointer">
-                        <option value="">Alle Statussen</option>
-                        <option value="todo" {{ request('status') == 'todo' ? 'selected' : '' }}>To-do</option>
-                        <option value="online" {{ request('status') == 'online' ? 'selected' : '' }}>Online</option>
-                        <option value="prep" {{ request('status') == 'prep' ? 'selected' : '' }}>Prep</option>
-                        <option value="personal" {{ request('status') == 'personal' ? 'selected' : '' }}>Eigen Gebruik</option>
-                    </select>
+                    <div class="relative sm:w-48">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-circle-half-stroke text-slate-400 text-xs"></i>
+                        </div>
+                        <select name="status" onchange="this.form.submit()" class="w-full pl-9 pr-8 py-2.5 rounded-xl border-slate-200/60 bg-white/60 text-sm font-medium focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition-all shadow-sm appearance-none">
+                            <option value="">Statussen</option>
+                            <option value="todo" {{ request('status') == 'todo' ? 'selected' : '' }}>To-do</option>
+                            <option value="online" {{ request('status') == 'online' ? 'selected' : '' }}>Online</option>
+                            <option value="prep" {{ request('status') == 'prep' ? 'selected' : '' }}>Prep</option>
+                            <option value="personal" {{ request('status') == 'personal' ? 'selected' : '' }}>Eigen Gebruik</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
                     @endif
 
                     @if(request()->hasAny(['search', 'category', 'brand', 'status']))
@@ -534,19 +626,19 @@
         <div x-show="showBulkActions" 
              style="display: none;"
              x-transition:enter="transition ease-out duration-300"
-             x-transition:enter-start="opacity-0 translate-y-10"
-             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:enter-start="opacity-0 translate-y-10 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
              x-transition:leave="transition ease-in duration-200"
-             x-transition:leave-start="opacity-100 translate-y-0"
-             x-transition:leave-end="opacity-0 translate-y-10"
-             class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-white border border-slate-200 text-slate-800 rounded-full shadow-2xl px-6 py-3 flex items-center gap-6 z-40 w-auto max-w-4xl ring-1 ring-slate-900/5">
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 translate-y-10 scale-95"
+             class="fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-white/70 backdrop-blur-2xl border border-white/60 text-slate-800 rounded-3xl shadow-[0_20px_60px_-10px_rgba(0,0,0,0.1),0_10px_30px_-10px_rgba(0,0,0,0.1)] px-4 py-3 flex items-center gap-2 z-50 w-auto max-w-4xl ring-1 ring-slate-900/5">
             
-            <div class="flex items-center gap-2 border-r border-slate-200 pr-6">
-                <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full" x-text="selectedItems.length"></span>
-                <span class="text-sm font-semibold text-slate-600">Geselecteerd</span>
+            <div class="flex items-center gap-3 border-r border-slate-200/60 pr-4 mr-2">
+                <span class="bg-indigo-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm shadow-indigo-300" x-text="selectedItems.length"></span>
+                <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Geselecteerd</span>
             </div>
 
-            <form method="POST" action="{{ route('inventory.bulkAction') }}" class="flex items-center gap-3" onsubmit="return confirm('Weet je het zeker?')">
+            <form method="POST" action="{{ route('inventory.bulkAction') }}" class="flex items-center gap-1.5" onsubmit="return confirm('Weet je het zeker?')">
                 @csrf
                 <input type="hidden" name="items" :value="JSON.stringify(selectedItems)">
                 <input type="hidden" name="action" id="bulkActionInput">
@@ -556,9 +648,8 @@
 
                 <!-- Status Action -->
                 <div class="relative group">
-                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
-                        <i class="fa-solid fa-tag text-slate-400"></i> Status
-                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    <button type="button" class="flex flex-col items-center justify-center w-16 h-14 rounded-2xl hover:bg-white/60 hover:shadow-sm text-xs font-medium transition-all duration-200 text-slate-600 hover:text-indigo-600 group-hover:-translate-y-1">
+                        <i class="fa-solid fa-tag text-lg mb-1.5 text-slate-400 group-hover:text-indigo-400"></i> Status
                     </button>
                     <!-- Dropdown -->
                     <div class="absolute bottom-full left-0 pb-2 hidden group-hover:block z-50">
@@ -574,9 +665,8 @@
 
                 <!-- Category Action -->
                 <div class="relative group">
-                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
-                        <i class="fa-solid fa-layer-group text-slate-400"></i> Categorie
-                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    <button type="button" class="flex flex-col items-center justify-center w-16 h-14 rounded-2xl hover:bg-white/60 hover:shadow-sm text-xs font-medium transition-all duration-200 text-slate-600 hover:text-indigo-600 group-hover:-translate-y-1">
+                        <i class="fa-solid fa-layer-group text-lg mb-1.5 text-slate-400 group-hover:text-indigo-400"></i> Groep
                     </button>
                     <div class="absolute bottom-full left-0 pb-2 hidden group-hover:block z-50">
                         <div class="w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 max-h-60 overflow-y-auto">
@@ -591,9 +681,8 @@
 
                 <!-- Parcel Action -->
                  <div class="relative group">
-                    <button type="button" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-100 text-sm font-semibold transition">
-                        <i class="fa-solid fa-box text-slate-400"></i> Pakket
-                        <i class="fa-solid fa-chevron-down text-xs text-slate-300"></i>
+                    <button type="button" class="flex flex-col items-center justify-center w-16 h-14 rounded-2xl hover:bg-white/60 hover:shadow-sm text-xs font-medium transition-all duration-200 text-slate-600 hover:text-indigo-600 group-hover:-translate-y-1">
+                        <i class="fa-solid fa-box text-lg mb-1.5 text-slate-400 group-hover:text-indigo-400"></i> Pakket
                     </button>
                     <div class="absolute bottom-full left-0 pb-2 hidden group-hover:block z-50">
                         <div class="w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 max-h-60 overflow-y-auto">
@@ -607,38 +696,42 @@
                 </div>
 
                 <!-- Delete Action -->
-                <button type="submit" onclick="document.getElementById('bulkActionInput').value='delete'" class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-red-50 text-red-600 text-sm font-semibold transition ml-2">
-                    <i class="fa-solid fa-trash"></i> Verwijderen
-                </button>
+                <div class="relative group ml-2 border-l border-slate-200/60 pl-2">
+                    <button type="submit" onclick="document.getElementById('bulkActionInput').value='delete'" class="flex flex-col items-center justify-center w-16 h-14 rounded-2xl hover:bg-white/60 hover:shadow-sm text-xs font-medium transition-all duration-200 text-red-500 hover:text-red-600 group-hover:-translate-y-1">
+                        <i class="fa-solid fa-trash text-lg mb-1.5 text-red-400 group-hover:text-red-500"></i> Wissen
+                    </button>
+                </div>
             </form>
 
-            <button @click="selectedItems = []; document.querySelectorAll('.item-checkbox').forEach(el => el.checked = false);" class="ml-auto text-slate-400 hover:text-slate-600">
-                <i class="fa-solid fa-times"></i>
+            <button @click="selectedItems = []; document.querySelectorAll('.item-checkbox').forEach(el => el.checked = false);" class="ml-4 flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors">
+                <i class="fa-solid fa-times text-xs"></i>
             </button>
         </div>
 
-        <div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden" x-show="viewMode === 'table'" x-cloak>
+        <div class="glass-card rounded-3xl shadow-sm border border-slate-200/60 overflow-hidden" x-show="viewMode === 'table'" x-cloak>
             <div class="overflow-x-auto">
                 <table class="w-full text-sm text-left">
-                    <thead class="bg-slate-50 border-b border-slate-200">
+                    <thead class="bg-slate-50/50 backdrop-blur-sm border-b border-slate-200/60 text-slate-500">
                         <tr>
                             <th class="px-6 py-5 w-16">
-                                <input type="checkbox" @change="toggleAll($event)" class="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                                <input type="checkbox" @change="toggleAll($event)" class="rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer transition-colors shadow-sm">
                             </th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Item Details</th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">QC</th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider">Pakket</th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Inkoop</th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Verkoop</th>
-                            <th class="px-6 py-5 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actie</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Item Details</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Status</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">QC</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Pakket</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Inkoop</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Verkoop</th>
+                            <th class="px-6 py-5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400 text-right">Actie</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100 bg-white" id="sortable-list">
+                    <tbody class="divide-y divide-slate-100/60 bg-white/40 backdrop-blur-md" id="sortable-list">
                         @forelse($items as $item)
-                        <tr class="item-row hover:bg-slate-50/80 transition-all duration-200 group border-l-4 border-l-transparent hover:border-l-indigo-500"
-                            :class="selectedItems.includes({{ $item->id }}) ? '!bg-indigo-50/50 !border-l-indigo-600' : ''"
+                        <tr class="item-row stagger-item hover:bg-white/80 transition-all duration-300 group border-l-4 border-l-transparent hover:border-l-indigo-400"
+                            style="animation-delay: {{ $loop->index * 50 }}ms;"
+                            :class="selectedItems.includes({{ $item->id }}) ? '!bg-indigo-50/80 !border-l-indigo-600 shadow-inner' : ''"
                             @click="toggleRow({{ $item->id }}, $event)"
+                            @contextmenu.prevent="openContextMenu($event, itemsStore[{{ $item->id }}])"
                             data-id="{{ $item->id }}">
                             <td class="px-6 py-4 align-middle">
                                 <div class="flex items-center gap-3">
@@ -694,11 +787,11 @@
                                     @csrf @method('PATCH')
                                     <div class="relative">
                                         <select name="status" onchange="this.form.submit()" 
-                                            class="appearance-none pl-3 pr-8 py-1.5 text-xs font-bold uppercase rounded-lg border-0 cursor-pointer focus:ring-2 focus:ring-offset-1 transition shadow-sm w-32
-                                            {{ $item->status == 'sold' ? 'bg-emerald-100 text-emerald-700 focus:ring-emerald-500' : 
-                                               ($item->status == 'online' ? 'bg-indigo-100 text-indigo-700 focus:ring-indigo-500' :                                                ($item->status == 'prep' ? 'bg-amber-100 text-amber-700 focus:ring-amber-500' : 
-                                                ($item->status == 'personal' ? 'bg-purple-100 text-purple-700 focus:ring-purple-500' :
-                                                'bg-slate-100 text-slate-600 focus:ring-slate-500'))) }}">
+                                            class="appearance-none pl-3 pr-8 py-2 text-[10px] font-extrabold uppercase tracking-wider rounded-xl border border-white/40 shadow-sm cursor-pointer focus:ring-2 focus:ring-offset-1 focus:ring-offset-white/50 transition-all w-32
+                                            {{ $item->status == 'sold' ? 'bg-emerald-100/80 text-emerald-700 focus:ring-emerald-400 hover:bg-emerald-200/80' : 
+                                               ($item->status == 'online' ? 'bg-indigo-100/80 text-indigo-700 focus:ring-indigo-400 hover:bg-indigo-200/80' :                                                ($item->status == 'prep' ? 'bg-amber-100/80 text-amber-700 focus:ring-amber-400 hover:bg-amber-200/80' : 
+                                                ($item->status == 'personal' ? 'bg-purple-100/80 text-purple-700 focus:ring-purple-400 hover:bg-purple-200/80' :
+                                                'bg-slate-100/80 text-slate-600 focus:ring-slate-400 hover:bg-slate-200/80'))) }}">
                                             @if($view === 'archive')
                                                 @if($item->status == 'personal')
                                                     <option value="personal" selected>Eigen Gebruik</option>
@@ -715,7 +808,7 @@
                                                 <option value="sold">Markeer Verkocht</option>
                                             @endif
                                         </select>
-                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400 mix-blend-multiply">
                                             <svg class="h-3 w-3 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
                                         </div>
                                     </div>
@@ -761,18 +854,18 @@
                                 <div class="flex justify-end items-center gap-2">
                                     @if($item->status !== 'sold')
                                         <button @click.stop="openSell({{ Js::from($item) }})" 
-                                            class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition shadow-sm hover:shadow-md flex items-center gap-1.5 border border-emerald-600">
+                                            class="bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-600 hover:to-emerald-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm hover:shadow-md hover:-translate-y-0.5 flex items-center gap-1.5 border border-emerald-400">
                                             <i class="fa-solid fa-money-bill-wave"></i> Verkopen
                                         </button>
                                     @endif
 
-                                    <button type="button" @click.stop="openEdit({{ Js::from($item) }})" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 bg-white hover:bg-indigo-50 border border-slate-200 rounded-lg transition shadow-sm" title="Bewerken">
+                                    <button type="button" @click.stop="openEdit({{ Js::from($item) }})" class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-indigo-600 bg-white/60 hover:bg-white border border-slate-200 hover:border-indigo-200 rounded-lg transition-all shadow-sm hover:shadow hover:-translate-y-0.5" title="Bewerken">
                                         <i class="fa-solid fa-pen text-xs"></i>
                                     </button>
                                     
                                     <form action="{{ route('inventory.destroy', $item) }}" method="POST" onsubmit="return confirm('Zeker weten?')">
                                         @csrf @method('DELETE')
-                                        <button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white hover:bg-red-50 border border-slate-200 rounded-lg transition shadow-sm" title="Verwijderen">
+                                        <button class="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-red-500 bg-white/60 hover:bg-white border border-slate-200 hover:border-red-200 rounded-lg transition-all shadow-sm hover:shadow hover:-translate-y-0.5" title="Verwijderen">
                                             <i class="fa-solid fa-trash text-xs"></i>
                                         </button>
                                     </form>
@@ -782,9 +875,11 @@
                         @empty
                         <tr>
                             <td colspan="10" class="text-center py-20">
-                                <div class="flex flex-col items-center justify-center text-slate-300">
-                                    <i class="fa-solid fa-box-open text-4xl mb-3 opacity-50"></i>
-                                    <span class="text-sm font-medium italic">Geen items gevonden in deze weergave.</span>
+                                <div class="flex flex-col items-center justify-center text-slate-400">
+                                    <div class="w-16 h-16 rounded-full bg-slate-100/50 flex items-center justify-center mb-4 border border-slate-200/50">
+                                        <i class="fa-solid fa-box-open text-2xl opacity-50"></i>
+                                    </div>
+                                    <span class="text-sm font-medium">Geen items gevonden in deze weergave.</span>
                                 </div>
                             </td>
                         </tr>
@@ -796,9 +891,11 @@
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" x-show="viewMode === 'cards'" x-cloak>
             @forelse($items as $item)
-                <div class="group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-slate-100 hover:border-indigo-100 flex flex-col h-full overflow-hidden" 
+                <div class="glass-card stagger-item group relative bg-white/60 backdrop-blur-sm rounded-3xl shadow-sm hover:shadow-xl transition-all duration-500 border border-slate-200/60 hover:border-indigo-200/60 flex flex-col h-full overflow-hidden hover:-translate-y-1" 
+                     style="animation-delay: {{ $loop->index * 50 }}ms;"
                      data-id="{{ $item->id }}"
-                     :class="selectedItems.includes({{ $item->id }}) ? 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100' : ''">
+                     @contextmenu.prevent="openContextMenu($event, itemsStore[{{ $item->id }}])"
+                     :class="selectedItems.includes({{ $item->id }}) ? 'ring-2 ring-indigo-500 border-transparent shadow-indigo-100/50 bg-indigo-50/30' : ''">
                     
                     <!-- Image Section -->
                     <div class="relative aspect-square bg-slate-50 overflow-hidden cursor-zoom-in" @click="openImage('{{ $item->image_url }}')">
@@ -852,20 +949,20 @@
                     </div>
 
                     <!-- Content Section -->
-                    <div class="p-4 flex flex-col flex-1">
-                        <div class="mb-1 flex justify-between items-start">
-                            <span class="js-item-brand text-[10px] font-extrabold tracking-wider text-slate-400 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
+                    <div class="p-5 flex flex-col flex-1">
+                        <div class="mb-2 flex justify-between items-start">
+                            <span class="js-item-brand text-[10px] font-extrabold tracking-widest text-slate-400 uppercase">{{ $item->brand ?? 'Onbekend' }}</span>
                             @if($item->size)
-                                <span class="js-item-size text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">{{ $item->size }}</span>
+                                <span class="js-item-size text-[10px] font-extrabold tracking-wider bg-slate-100/60 text-slate-500 px-2 py-0.5 rounded border border-slate-200/60 shadow-sm">{{ $item->size }}</span>
                             @endif
                         </div>
                         
-                        <h3 class="js-item-name font-bold text-slate-900 leading-tight mb-2 line-clamp-2 min-h-[2.5rem]" title="{{ $item->name }}">{{ $item->name }}</h3>
+                        <h3 class="js-item-name font-bold text-slate-800 text-lg leading-snug mb-3 line-clamp-2 min-h-[3rem] group-hover:text-indigo-600 transition-colors" title="{{ $item->name }}">{{ $item->name }}</h3>
                         
                         <div class="flex items-center gap-2 mb-4">
-                            <span class="js-item-category text-[10px] font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-lg border border-slate-100 truncate max-w-[100px]">{{ $item->category ?? 'Overige' }}</span>
+                            <span class="js-item-category text-[10px] font-bold bg-white/80 backdrop-blur-sm shadow-sm text-slate-500 border border-slate-100 px-2 py-1 rounded-lg truncate max-w-[120px]"><i class="fa-solid fa-layer-group text-slate-300 mr-1"></i> {{ $item->category ?? 'Overige' }}</span>
                             @if($item->order_nmr)
-                                <span class="text-[10px] font-mono text-blue-500 bg-blue-50 px-2 py-1 rounded-lg border border-blue-100 truncate" title="Order #{{ $item->order_nmr }}">#{{ $item->order_nmr }}</span>
+                                <span class="text-[10px] font-mono font-bold text-blue-600 bg-blue-50/80 shadow-sm border border-blue-100/50 px-2 py-1 rounded-lg truncate" title="Order #{{ $item->order_nmr }}">#{{ $item->order_nmr }}</span>
                             @endif
                         </div>
 
@@ -955,7 +1052,7 @@
 
 
         <!-- Kanban View -->
-        <div class="flex overflow-x-auto gap-6 pb-8 px-6" x-show="viewMode === 'kanban'" x-cloak>
+        <div class="flex overflow-x-auto gap-6 pb-8 px-2" x-show="viewMode === 'kanban'" x-cloak>
             @php
                 $configs = [
                     'todo' => ['label' => 'Warehouse', 'color' => 'slate', 'icon' => 'fa-warehouse'],
@@ -965,12 +1062,12 @@
                 ];
             @endphp
             @foreach($configs as $status => $config)
-                <div class="flex-shrink-0 w-80 flex flex-col h-full rounded-2xl bg-{{ $config['color'] }}-50/50 border border-{{ $config['color'] }}-100/50">
+                <div class="glass-card flex-shrink-0 w-80 flex flex-col h-full rounded-3xl bg-{{ $config['color'] }}-50/30 border border-{{ $config['color'] }}-100/40 shadow-sm">
                     <!-- Column Header -->
-                    <div class="p-4 flex items-center justify-between border-b border-{{ $config['color'] }}-100/50">
-                        <div class="flex items-center gap-2">
-                            <div class="w-8 h-8 rounded-lg bg-white shadow-sm text-{{ $config['color'] }}-600 flex items-center justify-center">
-                                <i class="fa-solid {{ $config['icon'] }}"></i>
+                    <div class="p-5 flex items-center justify-between border-b border-{{ $config['color'] }}-100/30 bg-white/20 rounded-t-3xl">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-xl bg-white shadow-sm border border-{{ $config['color'] }}-100/50 text-{{ $config['color'] }}-500 flex items-center justify-center">
+                                <i class="fa-solid {{ $config['icon'] }} text-lg"></i>
                             </div>
                             <h3 class="font-bold text-slate-800">{{ $config['label'] }}</h3>
                         </div>
@@ -980,36 +1077,46 @@
                     </div>
 
                     <!-- Column Content -->
-                    <div id="kanban-{{ $status }}" class="p-3 flex-1 overflow-y-auto min-h-[500px]" data-status="{{ $status }}">
+                    <div id="kanban-{{ $status }}" class="p-3 flex-1 overflow-y-auto min-h-[500px] space-y-3" data-status="{{ $status }}">
                         @foreach($items as $item)
                             @if($item->status == $status)
-                                <div class="kanban-item bg-white p-3 rounded-xl shadow-sm border border-slate-100 mb-3 cursor-grab hover:shadow-md transition-shadow group relative" 
-                                     data-id="{{ $item->id }}">
+                                <div class="kanban-item stagger-item bg-white/90 backdrop-blur border border-slate-200/50 p-3 rounded-2xl shadow-sm cursor-grab hover:shadow-md hover:border-indigo-200 transition-all duration-300 group relative hover:-translate-y-0.5" 
+                                     style="animation-delay: {{ $loop->index * 50 }}ms;"
+                                     data-id="{{ $item->id }}"
+                                     @contextmenu.prevent="openContextMenu($event, itemsStore[{{ $item->id }}])">
                                     
                                     <div class="flex gap-3">
                                         <!-- Mini Image -->
-                                        <div class="w-12 h-12 rounded-lg bg-slate-50 flex-shrink-0 overflow-hidden border border-slate-100">
+                                        <div class="relative w-14 h-14 rounded-xl bg-slate-50 flex-shrink-0 overflow-hidden border border-slate-100/50 shadow-inner group-hover:shadow-sm transition-shadow">
                                             @if($item->image_url)
-                                                <img src="{{ $item->image_url }}" class="w-full h-full object-cover">
+                                                <img src="{{ $item->image_url }}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110">
                                             @else
-                                                <div class="w-full h-full flex items-center justify-center text-slate-300">
-                                                    <i class="fa-solid fa-image text-xs"></i>
+                                                <div class="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                                                    <i class="fa-solid fa-image text-xs mb-1 opacity-50"></i>
                                                 </div>
                                             @endif
+                                            
+                                            <!-- Checkbox overlay -->
+                                            <div class="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                <input type="checkbox" class="item-checkbox rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer shadow-sm"
+                                                    value="{{ $item->id }}"
+                                                    @change="toggleItem({{ $item->id }})"
+                                                    :checked="selectedItems.includes({{ $item->id }})">
+                                            </div>
                                         </div>
 
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex justify-between items-start mb-0.5">
-                                                <span class="js-item-brand text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate">{{ $item->brand }}</span>
+                                        <div class="flex-1 min-w-0 flex flex-col py-0.5">
+                                            <div class="flex justify-between items-start mb-1">
+                                                <span class="js-item-brand text-[9px] font-extrabold text-slate-400 uppercase tracking-widest truncate">{{ $item->brand }}</span>
                                                 @if($item->size)
-                                                    <span class="js-item-size text-[9px] font-bold bg-slate-100 px-1 rounded text-slate-500">{{ $item->size }}</span>
+                                                    <span class="js-item-size text-[9px] font-bold bg-slate-100/80 px-1.5 py-0.5 rounded text-slate-500 shadow-sm border border-slate-200/50">{{ $item->size }}</span>
                                                 @endif
                                             </div>
-                                            <div class="js-item-name font-bold text-xs text-slate-800 leading-tight mb-1 line-clamp-2">{{ $item->name }}</div>
-                                            <div class="flex justify-between items-center">
-                                                <span class="js-item-sell-price font-mono text-xs font-bold text-slate-600">€{{ number_format($item->sell_price, 0) }}</span>
-                                                <button @click.stop="openEdit({{ Js::from($item) }})" class="text-slate-300 hover:text-indigo-600 transition">
-                                                    <i class="fa-solid fa-pen text-xs"></i>
+                                            <div class="js-item-name font-bold text-xs text-slate-800 leading-tight mb-auto line-clamp-2 group-hover:text-indigo-600 transition-colors">{{ $item->name }}</div>
+                                            <div class="flex justify-between items-end mt-2 pt-2 border-t border-slate-50">
+                                                <span class="js-item-sell-price font-bold text-xs text-slate-900 bg-white shadow-sm border border-slate-100 px-2 py-0.5 rounded-lg flex items-center gap-1"><span class="text-[9px] font-normal text-slate-400">€</span> {{ number_format($item->sell_price ?? 0, 0) }}</span>
+                                                <button @click.stop="openEdit({{ Js::from($item) }})" class="w-6 h-6 rounded-md bg-slate-50 hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-all flex items-center justify-center border border-slate-100 group-hover:border-indigo-100">
+                                                    <i class="fa-solid fa-pen text-[10px]"></i>
                                                 </button>
                                             </div>
                                         </div>
@@ -1019,8 +1126,8 @@
                         @endforeach
                         
                         <!-- Dient als dropzone target ook al is hij leeg -->
-                        <div class="h-10 border-2 border-dashed border-{{ $config['color'] }}-200/50 rounded-xl flex items-center justify-center text-{{ $config['color'] }}-300 text-xs font-medium opacity-50">
-                            Drop hier
+                        <div class="h-10 border-2 border-dashed border-{{ $config['color'] }}-200/50 rounded-2xl flex items-center justify-center text-{{ $config['color'] }}-400 text-[10px] font-bold uppercase tracking-wider opacity-50 bg-white/30 backdrop-blur-sm transition-opacity hover:opacity-100">
+                            Zet hier neer
                         </div>
                     </div>
                 </div>
@@ -1036,64 +1143,87 @@
         <!-- Quick Edit Modal -->
         <div x-show="showEditModal" style="display: none;" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div x-show="showEditModal" @click="showEditModal = false" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+                <div x-show="showEditModal" 
+                     x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" 
+                     x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+                     @click="showEditModal = false" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" aria-hidden="true"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
-                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-6" enctype="multipart/form-data" @submit.prevent="submitEditModal">
+                <div x-show="showEditModal"
+                     x-transition:enter="ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95" x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
+                     x-transition:leave="ease-in duration-200" x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100" x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
+                     class="inline-block align-bottom bg-white/95 backdrop-blur-xl rounded-[2rem] text-left overflow-hidden shadow-2xl border border-white transform transition-all sm:my-8 sm:align-middle sm:max-w-xl w-full">
+                    <form :action="'/inventory/' + editingItem.id" method="POST" class="p-8" enctype="multipart/form-data" @submit.prevent="submitEditModal">
                         @csrf @method('PATCH')
-                        <div class="mb-5 flex justify-between items-center">
-                            <h3 class="text-lg leading-6 font-bold text-gray-900" id="modal-title">Snel Bewerken</h3>
-                            <button type="button" @click="showEditModal = false" class="text-slate-400 hover:text-slate-500">
+                        <div class="mb-6 flex justify-between items-center bg-slate-50/50 -mt-8 -mx-8 px-8 py-5 border-b border-slate-100">
+                            <h3 class="text-xl font-bold border-gray-900" id="modal-title">Snel Bewerken</h3>
+                            <button type="button" @click="showEditModal = false" class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors">
                                 <span class="sr-only">Sluiten</span>
-                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                                <i class="fa-solid fa-times"></i>
                             </button>
                         </div>
-                        <div class="space-y-4">
+                        <div class="space-y-5">
                             <div>
-                                <label class="block text-sm font-medium text-slate-700">Naam</label>
-                                <input type="text" name="name" x-model="editingItem.name" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Naam</label>
+                                <input type="text" name="name" x-model="editingItem.name" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm transition-colors px-4 py-2.5">
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 gap-5">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Merk</label>
-                                    <input type="text" name="brand" x-model="editingItem.brand" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Merk</label>
+                                    <input type="text" name="brand" x-model="editingItem.brand" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm transition-colors px-4 py-2.5">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Maat</label>
-                                    <input type="text" name="size" x-model="editingItem.size" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Maat</label>
+                                    <input type="text" name="size" x-model="editingItem.size" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm transition-colors px-4 py-2.5">
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700">Categorie</label>
-                                <select name="category" x-model="editingItem.category" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Categorie</label>
+                                <select name="category" x-model="editingItem.category" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm transition-colors px-4 py-2.5">
                                     <option value="">Selecteer Categorie</option>
                                     @foreach($categories as $cat)
                                         <option value="{{ $cat }}">{{ $cat }}</option>
                                     @endforeach
                                 </select>
                             </div>
-                            <div class="grid grid-cols-2 gap-4">
+                            <div class="grid grid-cols-2 gap-5">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Inkoop</label>
-                                    <input type="number" step="0.01" name="buy_price" x-model="editingItem.buy_price" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Inkoop</label>
+                                    <div class="relative">
+                                        <span class="absolute left-4 top-2.5 text-slate-400 font-bold">€</span>
+                                        <input type="number" step="0.01" name="buy_price" x-model="editingItem.buy_price" class="block w-full pl-9 pr-4 py-2.5 rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm font-medium transition-colors">
+                                    </div>
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700">Verkoop</label>
-                                    <input type="number" step="0.01" name="sell_price" x-model="editingItem.sell_price" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+                                    <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Verkoop</label>
+                                    <div class="relative">
+                                        <span class="absolute left-4 top-2.5 text-slate-400 font-bold">€</span>
+                                        <input type="number" step="0.01" name="sell_price" x-model="editingItem.sell_price" class="block w-full pl-9 pr-4 py-2.5 rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm font-medium transition-colors">
+                                    </div>
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700">Notities</label>
-                                <textarea name="notes" x-model="editingItem.notes" rows="3" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"></textarea>
+                                <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Notities</label>
+                                <textarea name="notes" x-model="editingItem.notes" rows="2" class="block w-full rounded-xl border-slate-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-slate-50/50 focus:bg-white text-sm transition-colors px-4 py-3"></textarea>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-slate-700">Afbeelding</label>
-                                <input type="file" name="image" accept="image/*" class="mt-1 block w-full text-slate-500 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Afbeelding</label>
+                                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-300 border-dashed rounded-xl hover:border-indigo-400 transition-colors bg-slate-50/50">
+                                    <div class="space-y-1 text-center">
+                                        <i class="fa-solid fa-cloud-arrow-up text-3xl text-slate-400 mb-3"></i>
+                                        <div class="flex text-sm text-slate-600 justify-center">
+                                            <label for="file-upload" class="relative cursor-pointer rounded-md bg-transparent font-medium text-indigo-600 hover:text-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2">
+                                                <span>Upload een bestand</span>
+                                                <input id="file-upload" name="image" type="file" accept="image/*" class="sr-only">
+                                            </label>
+                                        </div>
+                                        <p class="text-xs text-slate-500">PNG, JPG, GIF up to 5MB</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        <div class="mt-6 flex justify-end gap-3">
-                            <button type="button" @click="showEditModal = false" class="bg-white py-2 px-4 border border-slate-300 rounded-xl shadow-sm text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none transition">Annuleren</button>
-                            <button type="submit" class="bg-indigo-600 py-2 px-4 border border-transparent rounded-xl shadow-sm text-sm font-bold text-white hover:bg-indigo-700 focus:outline-none transition">Opslaan</button>
+                        <div class="mt-8 flex justify-end gap-3 pt-6 border-t border-slate-100">
+                            <button type="button" @click="showEditModal = false" class="px-5 py-2.5 border border-slate-200 rounded-xl shadow-sm text-sm font-bold text-slate-600 bg-white hover:bg-slate-50 hover:text-slate-900 transition-colors">Annuleren</button>
+                            <button type="submit" class="px-5 py-2.5 border border-transparent rounded-xl shadow-sm shadow-indigo-200 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 hover:shadow-md hover:-translate-y-0.5 transition-all">Wijzigingen Opslaan</button>
                         </div>
                     </form>
                 </div>
@@ -1138,119 +1268,182 @@
             </div>
         </div>
 
-        <div x-show="showImport" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="showImport = false">
-             <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-2xl m-4">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-heading font-bold text-xl">Import Text</h3>
-                    <button @click="showImport = false" class="text-slate-400 hover:text-slate-600">✕</button>
+        <div x-show="showImport" x-cloak 
+             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" 
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm" @click.self="showImport = false">
+             
+             <div x-show="showImport"
+                  x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                  x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-4"
+                  class="bg-white/95 backdrop-blur-xl p-8 rounded-[2rem] shadow-2xl border border-white w-full max-w-2xl m-4">
+                
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="font-heading font-bold text-2xl text-slate-900">Import CSV of Tekst</h3>
+                    <button @click="showImport = false" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors">
+                        <i class="fa-solid fa-times text-lg"></i>
+                    </button>
                 </div>
                 <form action="{{ route('inventory.import') }}" method="POST" enctype="multipart/form-data">
                     @csrf
-                    <div class="mb-4">
-                        <label class="text-xs font-bold text-slate-500 uppercase">Koppel aan Pakket</label>
-                        <select name="parcel_id" class="w-full p-2.5 border-slate-200 rounded-xl mt-1 bg-slate-50">
-                            <option value="">Geen</option>
+                    <div class="mb-5">
+                        <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5">Koppel aan Pakket</label>
+                        <select name="parcel_id" class="w-full p-3 border border-slate-200 rounded-xl bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium">
+                            <option value="">Geen pakket koppelen</option>
                             @foreach($parcels as $p)
                                 <option value="{{$p->id}}">{{$p->parcel_no}}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="mb-4">
-                        <label class="text-xs font-bold text-slate-500 uppercase">Upload Order PDF</label>
-                        <input type="file" name="order_pdf" accept="application/pdf" class="w-full p-3 border-slate-200 rounded-xl mt-1 bg-slate-50">
-                        <p class="text-[11px] text-slate-400 mt-1">PDF wordt automatisch uitgelezen en toegevoegd aan voorraad.</p>
+                    
+                    <div class="mb-6 bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100/50">
+                        <label class="block text-xs font-extrabold uppercase tracking-wider text-indigo-800 mb-2">Upload Order PDF</label>
+                        <input type="file" name="order_pdf" accept="application/pdf" class="w-full text-sm text-slate-500 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 file:transition-colors file:cursor-pointer cursor-pointer bg-white rounded-xl border border-indigo-100 shadow-sm p-1.5">
+                        <p class="text-xs text-indigo-500 mt-2 flex items-center gap-1.5"><i class="fa-solid fa-magic"></i> PDF wordt automatisch uitgelezen en toegevoegd aan de voorraad.</p>
                     </div>
-                    <textarea name="import_text" class="w-full h-40 p-4 border-slate-200 rounded-xl mb-4 text-xs font-mono bg-slate-50 focus:bg-white transition" placeholder="Of plak hier de tekst van de order..."></textarea>
-                    <button class="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold w-full hover:bg-indigo-700 transition">Importeren 🚀</button>
-                </form>
-             </div>
-        </div>
 
-        <div x-show="showSellModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="showSellModal = false">
-             <div class="bg-white p-6 rounded-3xl shadow-2xl w-full max-w-sm m-4 transform transition-all scale-100">
-                <div class="flex justify-between items-center mb-6">
-                    <div class="flex items-center gap-3">
-                        <div class="bg-emerald-100 p-2 rounded-full">
-                            <i class="fa-solid fa-hand-holding-dollar text-emerald-600 text-xl"></i>
-                        </div>
-                        <h3 class="font-heading font-bold text-xl text-slate-800" x-text="sellModalMode === 'sold' ? 'Verkocht!' : 'Prijs Instellen'">Verkocht!</h3>
+                    <div class="mb-6 relative">
+                         <label class="block text-xs font-extrabold uppercase tracking-wider text-slate-500 mb-1.5 ">Of plak ruwe tekst</label>
+                        <textarea name="import_text" class="w-full h-48 p-4 border border-slate-200 rounded-xl text-sm font-mono bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner placeholder-slate-400" placeholder="Plak hier de gekopieerde tekst rijen van je agent (bijv. Superbuy, Sugargoo)..."></textarea>
                     </div>
-                    <button @click="showSellModal = false" class="text-slate-400 hover:text-slate-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition">✕</button>
-                </div>
-                
-                <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
-                    <p class="text-slate-600 text-sm font-medium">Item:</p>
-                    <p class="text-slate-900 font-bold text-lg leading-tight" x-text="sellingItem.name"></p>
-                </div>
 
-                <form @submit.prevent="submitSellModal">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide" x-text="sellModalMode === 'sold' ? 'Voor hoeveel is het verkocht?' : 'Verkoopprijs Instellen'"></label>
-                            <div class="relative mt-1">
-                                <span class="absolute left-4 top-3.5 text-emerald-600 font-bold text-lg">€</span>
-                                <input type="number" step="0.01" name="sell_price" required x-model="sellingItem.sell_price" 
-                                class="w-full pl-10 pr-4 py-3 rounded-xl border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 font-bold text-xl text-slate-800 shadow-sm transition" placeholder="0.00" autofocus>
-                            </div>
-                        </div>
-                        <div x-show="sellModalMode === 'sold'">
-                            <label class="text-xs font-bold text-slate-500 uppercase tracking-wide">Wanneer?</label>
-                            <input type="date" name="sold_date" x-model="sellingItem.sold_date" class="w-full p-3 rounded-xl border-slate-200 mt-1 focus:ring-indigo-500 focus:border-indigo-500 font-bold text-slate-700">
-                        </div>
-                        <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition shadow-xl shadow-slate-200 mt-4 flex justify-center items-center gap-2 transform active:scale-[0.98]">
-                           <i class="fa-solid fa-check"></i> <span x-text="sellModalMode === 'sold' ? 'Bevestigen' : 'Prijs Opslaan'"></span>
+                    <div class="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                        <button type="button" @click="showImport = false" class="px-6 py-3 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">Annuleren</button>
+                        <button type="submit" class="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-sm shadow-indigo-200 hover:shadow-md hover:bg-indigo-700 hover:-translate-y-0.5 transition-all flex items-center gap-2">
+                            <span>Importeren</span>
+                            <i class="fa-solid fa-cloud-arrow-up"></i>
                         </button>
                     </div>
                 </form>
              </div>
         </div>
 
-        <div x-show="showNew" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" @click.self="showNew = false">
-            <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-lg m-4 max-h-[90vh] overflow-y-auto">
+        <div x-show="showSellModal" x-cloak 
+             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" 
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-md" @click.self="showSellModal = false">
+             
+             <div x-show="showSellModal"
+                  x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-90 translate-y-8" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                  x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-4"
+                  class="bg-white/95 backdrop-blur-2xl p-8 rounded-[2rem] shadow-2xl border border-white w-full max-w-sm m-4">
+                
                 <div class="flex justify-between items-center mb-6">
-                    <h3 class="font-heading font-bold text-xl">Nieuw Item</h3>
-                    <button @click="showNew = false" class="text-slate-400 hover:text-slate-600">✕</button>
+                    <div class="flex items-center gap-4">
+                        <div class="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
+                            <i class="fa-solid fa-hand-holding-dollar text-white text-xl"></i>
+                        </div>
+                        <h3 class="font-heading font-bold text-2xl text-slate-900" x-text="sellModalMode === 'sold' ? 'Verkocht!' : 'Prijs Instellen'">Verkocht!</h3>
+                    </div>
+                    <button @click="showSellModal = false" class="text-slate-400 hover:text-slate-600 w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
+                        <i class="fa-solid fa-times text-lg"></i>
+                    </button>
+                </div>
+                
+                <div class="bg-slate-50/80 backdrop-blur-sm p-5 rounded-2xl border border-slate-100 mb-8 overflow-hidden relative">
+                    <p class="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1.5">Item geselecteerd</p>
+                    <p class="text-slate-800 font-bold text-lg leading-tight truncate z-10 relative" x-text="sellingItem.name"></p>
+                    <i class="fa-solid fa-box text-6xl absolute -right-4 -bottom-4 text-slate-200/50 z-0 transform -rotate-12"></i>
+                </div>
+
+                <form @submit.prevent="submitSellModal">
+                    <div class="space-y-6">
+                        <div>
+                            <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-2" x-text="sellModalMode === 'sold' ? 'Voor hoeveel heb je het verkocht?' : 'Verkoopprijs Instellen'"></label>
+                            <div class="relative mt-1">
+                                <span class="absolute left-5 top-1/2 -translate-y-1/2 text-emerald-500 font-bold text-2xl">€</span>
+                                <input type="number" step="0.01" name="sell_price" required x-model="sellingItem.sell_price" 
+                                class="w-full pl-12 pr-6 py-4 rounded-2xl border border-slate-200 bg-white shadow-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 font-bold text-3xl text-slate-800 transition-all placeholder-slate-300" placeholder="0.00" autofocus>
+                            </div>
+                        </div>
+                        
+                        <div x-show="sellModalMode === 'sold'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0">
+                            <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-2">Datum van Verkoop</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <i class="fa-regular fa-calendar text-slate-400"></i>
+                                </div>
+                                <input type="date" name="sold_date" x-model="sellingItem.sold_date" class="w-full pl-11 pr-4 py-3.5 rounded-xl border border-slate-200 bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-400 font-bold text-slate-700 shadow-sm transition-all text-sm">
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 mt-8 flex justify-center items-center gap-2 text-lg active:scale-95">
+                           <i x-show="sellModalMode === 'sold'" class="fa-solid fa-check text-emerald-400"></i>
+                           <i x-show="sellModalMode !== 'sold'" class="fa-solid fa-floppy-disk text-indigo-400"></i>
+                           <span x-text="sellModalMode === 'sold' ? 'Bevestigen' : 'Prijs Opslaan'"></span>
+                        </button>
+                    </div>
+                </form>
+             </div>
+        </div>
+
+        <div x-show="showNew" x-cloak 
+             x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" 
+             x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+             class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm" @click.self="showNew = false">
+             
+            <div x-show="showNew"
+                 x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 scale-95 translate-y-4" x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-200" x-transition:leave-start="opacity-100 scale-100 translate-y-0" x-transition:leave-end="opacity-0 scale-95 translate-y-4"
+                 class="bg-white/95 backdrop-blur-xl p-8 rounded-[2rem] shadow-2xl w-full max-w-xl m-4 border border-white max-h-[90vh] overflow-y-auto custom-scrollbar">
+                
+                <div class="flex justify-between items-center mb-8 pb-4 border-b border-slate-100">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-indigo-100 text-indigo-600 w-10 h-10 rounded-xl flex items-center justify-center shadow-sm">
+                            <i class="fa-solid fa-plus"></i>
+                        </div>
+                        <h3 class="font-heading font-bold text-2xl text-slate-900">Nieuw Item</h3>
+                    </div>
+                    <button @click="showNew = false" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition-colors">
+                        <i class="fa-solid fa-times text-lg"></i>
+                    </button>
                 </div>
 
                 <form action="{{ route('inventory.store') }}" method="POST">
                     @csrf
-                    <div class="space-y-4">
+                    <div class="space-y-5">
                         @if($templates->count() > 0)
-                        <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
-                            <label class="text-xs font-bold text-indigo-800 uppercase block mb-1">⚡️ Vul snel in met Preset</label>
-                            <select @change="applyPreset($event)" class="w-full p-2 border-indigo-200 rounded-lg text-sm focus:ring-indigo-500">
-                                <option value="">Kies een template...</option>
-                                @foreach($templates as $tpl)
-                                    <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
-                                @endforeach
-                            </select>
+                        <div class="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 relative overflow-hidden group">
+                            <div class="absolute -right-4 -top-4 w-16 h-16 bg-indigo-500 rounded-full opacity-10 blur-xl group-hover:scale-150 transition-transform duration-700"></div>
+                            <label class="text-xs font-extrabold text-indigo-600 uppercase tracking-widest block mb-2"><i class="fa-solid fa-bolt mr-1"></i> Preset Gebruiken</label>
+                            <div class="relative">
+                                <select @change="applyPreset($event)" class="w-full pl-4 pr-10 py-3 border border-white bg-white/60 rounded-xl text-sm font-bold text-slate-800 focus:bg-white focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 appearance-none transition-all shadow-sm">
+                                    <option value="">Selecteer om vliegensvlug in te vullen...</option>
+                                    @foreach($templates as $tpl)
+                                        <option value="{{ $tpl->id }}">{{ $tpl->name }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-indigo-500">
+                                    <i class="fa-solid fa-angle-down"></i>
+                                </div>
+                            </div>
                         </div>
                         @endif
 
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Naam*</label>
-                            <input type="text" id="new_name" name="name" required class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                            <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Naam*</label>
+                            <input type="text" id="new_name" name="name" required class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
                         </div>
 
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Order Nmr</label>
-                            <input type="text" id="new_order_nmr" name="order_nmr" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                            <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Order Nmr</label>
+                            <input type="text" id="new_order_nmr" name="order_nmr" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
                         </div>
 
-                        <div class="flex gap-3">
+                        <div class="flex gap-4">
                             <div class="w-1/2">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Merk</label>
-                                <input type="text" id="new_brand" name="brand" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                                <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Merk</label>
+                                <input type="text" id="new_brand" name="brand" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
                             </div>
                             <div class="w-1/2">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Maat</label>
-                                <input type="text" id="new_size" name="size" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                                <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Maat</label>
+                                <input type="text" id="new_size" name="size" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
                             </div>
                         </div>
 
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Categorie</label>
-                            <select id="new_category" name="category" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                            <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Categorie</label>
+                            <select id="new_category" name="category" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
                                 <option value="">Automatisch bepalen</option>
                                 @foreach($categories as $cat)
                                     <option value="{{ $cat }}">{{ $cat }}</option>
@@ -1261,20 +1454,26 @@
                             </select>
                         </div>
 
-                        <div class="flex gap-3">
+                        <div class="flex gap-4">
                             <div class="w-1/2">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Inkoop (€)</label>
-                                <input type="number" step="0.01" id="new_buy_price" name="buy_price" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                                <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Inkoop (€)</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                                    <input type="number" step="0.01" id="new_buy_price" name="buy_price" class="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
+                                </div>
                             </div>
                             <div class="w-1/2">
-                                <label class="text-xs font-bold text-slate-500 uppercase">Verkoop (€)</label>
-                                <input type="number" step="0.01" id="new_sell_price" name="sell_price" class="w-full p-3 rounded-xl border-slate-200 mt-1">
+                                <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Verkoop (€)</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">€</span>
+                                    <input type="number" step="0.01" id="new_sell_price" name="sell_price" class="w-full pl-9 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
+                                </div>
                             </div>
                         </div>
 
                         <div>
-                            <label class="text-xs font-bold text-slate-500 uppercase">Pakket (Optioneel)</label>
-                            <select name="parcel_id" class="w-full p-3 rounded-xl border-slate-200 mt-1 bg-white">
+                            <label class="text-xs font-extrabold text-slate-500 uppercase tracking-widest block mb-1.5">Pakket (Optioneel)</label>
+                            <select name="parcel_id" class="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:bg-white focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium text-slate-800">
                                 <option value="">Geen</option>
                                 @foreach($parcels as $p)
                                     <option value="{{ $p->id }}">{{ $p->parcel_no }}</option>
@@ -1282,7 +1481,12 @@
                             </select>
                         </div>
 
-                        <button class="w-full bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition shadow-lg mt-2">Opslaan</button>
+                        <div class="pt-6 border-t border-slate-100 flex gap-3">
+                            <button type="button" @click="showNew = false" class="w-1/3 py-4 rounded-xl font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors">Annuleren</button>
+                            <button type="submit" class="w-2/3 bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:shadow-xl hover:-translate-y-0.5 hover:bg-indigo-700 transition-all flex justify-center items-center gap-2">
+                                <i class="fa-solid fa-plus"></i> Item Opslaan
+                            </button>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -1306,6 +1510,50 @@
                 
                 <img :src="activeImageUrl" class="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl ring-1 ring-white/10" @click.stop>
             </div>
+        </div>
+        <!-- Global Context Menu -->
+        <div x-show="contextMenu.show" 
+             @click.outside="closeContextMenu()"
+             @keydown.escape.window="closeContextMenu()"
+             @scroll.window="closeContextMenu()"
+             class="fixed z-[300] bg-white/95 backdrop-blur-xl border border-slate-200/60 shadow-2xl rounded-2xl w-56 p-1.5 flex flex-col gap-0.5 overflow-hidden"
+             :style="`left: ${contextMenu.x}px; top: ${contextMenu.y}px;`"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95"
+             x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             style="display: none;">
+             
+             <!-- Item Header in Menu -->
+             <div class="px-3 py-2 border-b border-slate-100/60 mb-1">
+                 <div class="text-[10px] font-extrabold uppercase tracking-widest text-slate-400 mb-0.5" x-text="contextMenu.item?.brand || 'Onbekend'"></div>
+                 <div class="text-xs font-bold text-slate-800 line-clamp-1" x-text="contextMenu.item?.name"></div>
+             </div>
+
+            <template x-if="contextMenu.item?.status !== 'sold'">
+                <button @click="closeContextMenu(); openSell(contextMenu.item)" class="w-full text-left px-3 py-2 text-sm font-medium text-slate-700 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors flex items-center justify-between group">
+                    <span class="flex items-center gap-2.5"><i class="fa-solid fa-money-bill-wave text-slate-400 group-hover:text-emerald-500 w-4 text-center"></i> Verkopen</span>
+                </button>
+            </template>
+
+            <button @click="closeContextMenu(); openEdit(contextMenu.item)" class="w-full text-left px-3 py-2 text-sm font-medium text-slate-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors flex items-center justify-between group">
+                <span class="flex items-center gap-2.5"><i class="fa-solid fa-pen text-slate-400 group-hover:text-indigo-500 w-4 text-center"></i> Bewerken</span>
+            </button>
+
+            <button @click="closeContextMenu(); openImage(contextMenu.item?.image_url)" class="w-full text-left px-3 py-2 text-sm font-medium text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors flex items-center justify-between group">
+                <span class="flex items-center gap-2.5"><i class="fa-solid fa-image text-slate-400 group-hover:text-blue-500 w-4 text-center"></i> Foto Bekijken</span>
+            </button>
+            
+            <div class="h-px bg-slate-100/60 my-1"></div>
+
+            <form :action="`/inventory/${contextMenu.item?.id}`" method="POST" @submit="if(!confirm('Zeker weten verwijderen?')) $event.preventDefault()" class="w-full">
+                @csrf @method('DELETE')
+                <button type="submit" class="w-full text-left px-3 py-2 text-sm font-medium text-slate-700 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors flex items-center justify-between group">
+                    <span class="flex items-center gap-2.5"><i class="fa-solid fa-trash text-slate-400 group-hover:text-red-500 w-4 text-center"></i> Verwijderen</span>
+                </button>
+            </form>
         </div>
 
     </div>
