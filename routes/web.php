@@ -67,6 +67,9 @@ require __DIR__ . '/auth.php';
 Route::post('/superbuy/import-extension', [SuperbuyController::class, 'importFromExtension'])
     ->name('superbuy.import_extension');
 
-    // Check of items al bestaan (voor de extensie)
+Route::post('/superbuy/import-parcel-extension', [SuperbuyController::class, 'importParcelFromExtension'])
+    ->name('superbuy.import_parcel_extension');
+
+// Check of items al bestaan (voor de extensie)
 Route::post('/superbuy/check-items', [SuperbuyController::class, 'checkExistingItems'])
     ->name('superbuy.check');

@@ -93,6 +93,81 @@ class SuperbuyController extends Controller
     }
 
     /**
+     * Parseert en slaat een compleet pakket + items op.
+     */
+    public function importParcelFromExtension(Request $request)
+    {
+        $receivedSecret = $request->input('secret');
+
+        if (!$receivedSecret) {
+            return response()->json(['error' => 'Geen secret ontvangen.'], 401);
+        }
+
+        // Zoek de gebruiker die bij deze secret hoort
+        $user = User::where('sync_secret', $receivedSecret)->first();
+
+        if (!$user) {
+            Log::warning("Superbuy Sync: Ongeldige secret geprobeerd: '{$receivedSecret}'");
+            return response()->json(['error' => 'Ongeldige Secret Key.'], 401);
+        }
+
+        $items = $request->input('items');
+        $parcelData = $request->input('parcel');
+        
+        if (!$items || !is_array($items)) {
+            return response()->json(['error' => 'Geen items ontvangen'], 400);
+        }
+
+        if (!$parcelData || !isset($parcelData['parcelNo'])) {
+             return response()->json(['error' => 'Geen pakket data ontvangen'], 400);
+        }
+
+        $parcelNo = $parcelData['parcelNo'];
+        $shippingCostRaw = $parcelData['shippingCostRaw'] ?? '0';
+        
+        // Converteer shipping cost naar decimaal (bv. EU €56.30 -> 56.30)
+        preg_match('/([\d\.,]+)/', $shippingCostRaw, $matches);
+        $shippingCost = isset($matches[1]) ? floatval(str_replace(',', '.', $matches[1])) : 0.00;
+
+        // Find or create parcel
+        $parcel = \App\Models\Parcel::firstOrCreate(
+            ['user_id' => $user->id, 'parcel_no' => $parcelNo],
+            ['status' => 'Onderweg', 'description' => 'Superbuy pakket', 'shipping_cost' => $shippingCost]
+        );
+        
+        // Update shipping cost always to have the latest
+        $parcel->shipping_cost = $shippingCost;
+        $parcel->save();
+
+        $count = 0;
+        foreach ($items as $itemData) {
+            $orderNo = $itemData['orderNo'] ?? 'UNKNOWN';
+            try {
+                $item = $this->superbuyService->importItem($user, $itemData, $orderNo);
+                if ($item) {
+                     // Koppel item aan parcel
+                     $item->parcel_id = $parcel->id;
+                     
+                     // Optioneel: Update de status als hij in een pakket zit
+                     if ($item->status !== 'Gemarkeerd als verkocht' && !$item->is_sold) {
+                         $item->status = 'shipped'; // Of wat jouw statussen ook zijn
+                     }
+                     
+                     $item->save();
+                     $count++;
+                }
+            } catch (\Exception $e) {
+                Log::error("Import error parcel {$parcelNo} - item {$orderNo}: " . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'success' => true, 
+            'message' => "Pakket {$parcelNo} gekoppeld met {$count} items!"
+        ]);
+    }
+
+    /**
      * Checkt welke items al in de database staan op basis van Unieke ID (DI...)
      */
         public function checkExistingItems(Request $request)

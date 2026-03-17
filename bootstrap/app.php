@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'superbuy/import-extension',
             'superbuy/check-items',
+            'superbuy/import-parcel-extension',
         ]);
         
     })
