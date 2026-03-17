@@ -267,11 +267,11 @@
                                     this.showEditModal = false;
                                 }
                             } else {
-                                alert('Er ging iets mis bij het opslaan.');
+                                window.dispatchEvent(new CustomEvent('notify', {detail: {msg: 'Er ging iets mis bij het opslaan.', type: 'error'}}));
                             }
                         } catch (error) {
                             console.error(error);
-                            alert('Netwerkfout.');
+                            window.dispatchEvent(new CustomEvent('notify', {detail: {msg: 'Netwerkfout.', type: 'error'}}));
                         }
                     },
 
@@ -322,30 +322,39 @@
                                     if(mode === 'sold') this.itemsStore[id].sold_date = this.sellingItem.sold_date;
                                 }
 
-                                // Move item in DOM visually - SPECIFICALLY target the kanban item
-                                // We look for the element inside the kanban container to be safe, or use a specific class
-                                const itemEl = document.querySelector(`.kanban-item[data-id="${id}"]`);
-                                if (itemEl) {
-                                    const newStatus = mode === 'sold' ? 'sold' : 'online';
-                                    const targetList = document.getElementById(`kanban-${newStatus}`);
-                                    if (targetList) {
-                                        // Check if it's already there to avoid duplicates (though move should handle it)
-                                        targetList.insertBefore(itemEl, targetList.firstChild);
-                                    }
-                                    
-                                    // Update price text on card
-                                    const priceEl = itemEl.querySelector('.font-mono');
-                                    if(priceEl) priceEl.textContent = '€' + parseFloat(this.sellingItem.sell_price).toFixed(0);
+                                // Hide item from DOM visually across all views
+                                if (this.viewMode !== 'archive') {
+                                    document.querySelectorAll(`[data-id="${id}"]`).forEach(el => {
+                                        el.style.transition = 'all 0.5s ease';
+                                        el.style.opacity = '0';
+                                        el.style.transform = 'scale(0.9)';
+                                        setTimeout(() => el.remove(), 500);
+                                    });
                                 }
 
                                 this.showSellModal = false;
                                 this.sellingItem = {};
+
+                                if (mode === 'sold') {
+                                    confetti({
+                                      particleCount: 150,
+                                      spread: 70,
+                                      origin: { y: 0.6 },
+                                      colors: ['#10B981', '#34D399', '#059669', '#A7F3D0'],
+                                      zIndex: 2000
+                                    });
+                                    window.dispatchEvent(new CustomEvent('notify', {detail: {msg: 'Item succesvol verkocht! 🎉', type: 'success'}}));
+                                    setTimeout(() => window.location.reload(), 2500);
+                                } else {
+                                    window.dispatchEvent(new CustomEvent('notify', {detail: {msg: 'Prijs succesvol ingesteld.', type: 'success'}}));
+                                    setTimeout(() => window.location.reload(), 1500);
+                                }
                             } else {
-                                alert('Er ging iets mis bij het opslaan.');
+                                window.dispatchEvent(new CustomEvent('notify', {detail: {msg: 'Er ging iets mis bij het opslaan.', type: 'error'}}));
                             }
                         } catch (e) {
                             console.error(e);
-                            alert('Netwerkfout.');
+                            window.dispatchEvent(new CustomEvent('notify', {detail: {msg: 'Netwerkfout.', type: 'error'}}));
                         }
                     },
 
@@ -434,6 +443,7 @@
          </script>
          
          <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.14.0/Sortable.min.js"></script>
+         <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
          
          <script>
             function updateSortOrder() {
@@ -463,40 +473,44 @@
              x-transition:enter-end="opacity-100 translate-y-0">
              
             <!-- Active Items -->
-            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                 x-data="{ count: 0 }" x-init="let target = {{ (float)$insights['total_active'] }}; if(target===0){count=0;return;} let step = Math.ceil(target/20); let timer = setInterval(() => { count += step; if(count >= target) { count = target; clearInterval(timer); } }, 30)">
                 <div class="flex items-center gap-3 mb-2">
                     <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white transition-colors">
                         <i class="fa-solid fa-boxes-stacked"></i>
                     </div>
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Actief</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Actieve Voorraad</span>
                 </div>
-                <div class="text-2xl font-black text-slate-800 font-heading">{{ $insights['total_active'] }} <span class="text-sm text-slate-400 font-normal">items</span></div>
+                <div class="text-2xl font-black text-slate-800 font-heading"><span x-text="count"></span> <span class="text-sm text-slate-400 font-normal">items</span></div>
             </div>
 
-            <!-- Total Buy Value -->
-            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
+            <!-- Active Buy Value (Huidige Voorraadwaarde) -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                 x-data="{ count: 0 }" x-init="let target = {{ (float)$insights['active_buy_value'] }}; if(target===0){count=0;return;} let step = target/20; let timer = setInterval(() => { count += step; if(count >= target) { count = target; clearInterval(timer); } }, 30)">
                 <div class="flex items-center gap-3 mb-2">
                     <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500 group-hover:bg-emerald-500 group-hover:text-white transition-colors">
-                        <i class="fa-solid fa-money-bill-wave"></i>
+                        <i class="fa-solid fa-sack-dollar"></i>
                     </div>
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Inkoopwaarde</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Voorraadwaarde</span>
                 </div>
-                <div class="text-2xl font-black text-slate-800 font-heading">€{{ number_format($insights['total_buy_value'], 2, ',', '.') }}</div>
+                <div class="text-2xl font-black text-slate-800 font-heading">€<span x-text="count.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></div>
             </div>
 
-            <!-- Items Sold -->
-            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group">
+            <!-- Total Invested (Totale Investering) -->
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                 x-data="{ count: 0 }" x-init="let target = {{ (float)$insights['total_invested'] }}; if(target===0){count=0;return;} let step = target/20; let timer = setInterval(() => { count += step; if(count >= target) { count = target; clearInterval(timer); } }, 30)">
                 <div class="flex items-center gap-3 mb-2">
                     <div class="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 group-hover:bg-blue-500 group-hover:text-white transition-colors">
-                        <i class="fa-solid fa-tags"></i>
+                        <i class="fa-solid fa-piggy-bank"></i>
                     </div>
-                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Verkocht</span>
+                    <span class="text-xs font-bold text-slate-500 uppercase tracking-widest">Totale Investering</span>
                 </div>
-                <div class="text-2xl font-black text-slate-800 font-heading">{{ $insights['total_sold'] }} <span class="text-sm text-slate-400 font-normal">items</span></div>
+                <div class="text-2xl font-black text-slate-800 font-heading">€<span x-text="count.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></div>
             </div>
 
             <!-- Total Profit -->
-            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden">
+            <div class="bg-white/70 backdrop-blur-xl border border-white p-5 rounded-2xl shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all group relative overflow-hidden"
+                 x-data="{ count: 0 }" x-init="let target = {{ (float)$insights['total_profit'] }}; if(target===0){count=0;return;} let step = target/20; let timer = setInterval(() => { count += step; if(target > 0 ? count >= target : count <= target) { count = target; clearInterval(timer); } }, 30)">
                 <div class="absolute -right-4 -top-4 w-20 h-20 bg-purple-400 rounded-full opacity-10 blur-xl group-hover:scale-150 transition-transform duration-700"></div>
                 <div class="flex items-center gap-3 mb-2">
                     <div class="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors z-10">
@@ -504,7 +518,7 @@
                     </div>
                     <span class="text-xs font-bold text-slate-500 uppercase tracking-widest z-10">Totale Winst</span>
                 </div>
-                <div class="text-2xl font-black text-purple-600 font-heading z-10 relative">€{{ number_format($insights['total_profit'], 2, ',', '.') }}</div>
+                <div class="text-2xl font-black text-purple-600 font-heading z-10 relative">€<span x-text="count.toLocaleString('nl-NL', {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span></div>
             </div>
         </div>
 
@@ -544,11 +558,11 @@
                 </div>
             </div>
 
-            <div class="glass-card p-5 rounded-2xl flex flex-col lg:flex-row gap-4 justify-between items-center mb-8">
-                <form method="GET" action="{{ route('inventory.index') }}" class="flex flex-col sm:flex-row gap-4 w-full lg:w-auto flex-1">
+            <div class="glass-card p-5 rounded-2xl flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center mb-8">
+                <form method="GET" action="{{ route('inventory.index') }}" class="flex flex-col sm:flex-row flex-wrap gap-4 w-full lg:w-auto flex-1 items-center">
                     <input type="hidden" name="view" value="{{ $view }}">
 
-                    <div class="relative w-full sm:w-72">
+                    <div class="relative w-full sm:w-64">
                         <input type="text" name="search" value="{{ request('search') }}" placeholder="Zoek op naam, merk, of id..."
                             class="w-full pl-11 pr-4 py-2.5 rounded-xl border-slate-200/60 bg-white/60 text-sm focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all font-medium placeholder-slate-400 shadow-sm">
                         <div class="absolute left-4 top-3 text-indigo-400">
@@ -586,6 +600,21 @@
                         </div>
                     </div>
 
+                    <div class="relative sm:w-48">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i class="fa-solid fa-box text-slate-400 text-xs"></i>
+                        </div>
+                        <select name="parcel" onchange="this.form.submit()" class="w-full pl-9 pr-8 py-2.5 rounded-xl border-slate-200/60 bg-white/60 text-sm font-medium focus:border-indigo-400 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 cursor-pointer transition-all shadow-sm appearance-none">
+                            <option value="">Alle Pakketten</option>
+                            @foreach($parcels as $p)
+                                <option value="{{ $p->id }}" {{ request('parcel') == $p->id ? 'selected' : '' }}>{{ $p->parcel_no }}</option>
+                            @endforeach
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none">
+                            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+
                     @if($view !== 'archive')
                     <div class="relative sm:w-48">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -604,7 +633,7 @@
                     </div>
                     @endif
 
-                    @if(request()->hasAny(['search', 'category', 'brand', 'status']))
+                    @if(request()->hasAny(['search', 'category', 'brand', 'status', 'parcel']))
                         <a href="{{ route('inventory.index', ['view' => $view]) }}" class="flex items-center justify-center px-3 py-2 text-slate-400 hover:text-red-500 transition">✕</a>
                     @endif
                 </form>
@@ -1556,5 +1585,26 @@
             </form>
         </div>
 
+    </div>
+
+    <!-- Global Toast Container -->
+    <div x-data="{ toasts: [] }" 
+         @notify.window="toasts.push({ id: Date.now(), msg: $event.detail.msg, type: $event.detail.type || 'success' }); setTimeout(() => { toasts.shift() }, 3000)"
+         class="fixed bottom-5 right-5 z-[200] flex flex-col gap-3 pointer-events-none">
+        
+         <template x-for="toast in toasts" :key="toast.id">
+             <div x-show="true" 
+                  x-transition:enter="transition ease-out duration-300 transform" 
+                  x-transition:enter-start="opacity-0 translate-y-4 scale-95" 
+                  x-transition:enter-end="opacity-100 translate-y-0 scale-100" 
+                  x-transition:leave="transition ease-in duration-200 transform" 
+                  x-transition:leave-start="opacity-100 scale-100" 
+                  x-transition:leave-end="opacity-0 scale-95" 
+                  class="px-5 py-3 rounded-2xl shadow-xl backdrop-blur-md border border-white/20 text-white font-bold text-sm tracking-wide flex items-center gap-3"
+                  :class="toast.type === 'success' ? 'bg-emerald-500/90 shadow-emerald-500/20' : 'bg-red-500/90 shadow-red-500/20'">
+                 <i class="fa-solid" :class="toast.type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'"></i>
+                 <span x-text="toast.msg"></span>
+             </div>
+         </template>
     </div>
 </x-app-layout>

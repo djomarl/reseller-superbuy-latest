@@ -62,20 +62,27 @@ class InventoryController extends Controller
              $query->where('status', $request->status);
         }
 
+        // 5.5 Filteren op Parcel (Pakket)
+        if ($request->filled('parcel')) {
+            $query->where('parcel_id', $request->parcel);
+        }
+
         // 6. Calculate Insights Data
         $activeItems = Item::where('user_id', $userId)->where('is_sold', false)->where('status', '!=', 'personal');
         $soldItems = Item::where('user_id', $userId)->where('is_sold', true);
+        $allItems = Item::where('user_id', $userId);
 
         $insights = [
             'total_active' => $activeItems->count(),
-            'total_buy_value' => $activeItems->sum('buy_price'),
+            'active_buy_value' => $activeItems->sum('buy_price'),
+            'total_invested' => $allItems->sum('buy_price'),
             'total_sold' => $soldItems->count(),
             'total_revenue' => $soldItems->sum('sell_price'),
             'total_profit' => $soldItems->sum('sell_price') - $soldItems->sum('buy_price'),
         ];
 
-        // Data ophalen (met paginering voor de cards view)
-        $items = $query->with('parcel')->orderBy('sort_order', 'desc')->latest()->paginate(24)->withQueryString();
+        // Data ophalen (met paginering voor de cards view verhoogd naar 100 om Kanban te fixen)
+        $items = $query->with('parcel')->orderBy('sort_order', 'desc')->latest()->paginate(100)->withQueryString();
 
         // Data voor de filters en dropdowns
         $dbCategories = Item::where('user_id', $userId)->whereNotNull('category')->distinct()->pluck('category')->toArray();
@@ -248,6 +255,10 @@ class InventoryController extends Controller
             'sell_price' => $validated['sell_price'],
             'sold_date' => $validated['sold_date'] ?? now(),
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'item' => $item]);
+        }
 
         return redirect()->route('inventory.index')->with('success', 'Item gemarkeerd als verkocht! 🤑');
     }

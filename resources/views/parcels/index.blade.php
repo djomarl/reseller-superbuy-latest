@@ -26,11 +26,19 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                                 </div>
                                 <div>
-                                    <h3 class="font-bold text-lg text-slate-800">{{ $parcel->parcel_no }}</h3>
-                                    <span class="text-xs uppercase font-bold px-2 py-0.5 rounded 
-                                        {{ $parcel->status == 'arrived' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500' }}">
-                                        {{ $parcel->status == 'arrived' ? 'Ontvangen' : ($parcel->status == 'shipped' ? 'Onderweg' : 'Prep') }}
-                                    </span>
+                                    <a href="{{ route('inventory.index', ['view' => 'active', 'parcel' => $parcel->id]) }}" class="font-bold text-lg text-slate-800 hover:text-indigo-600 flex items-center gap-2 transition-colors group/link pb-1" title="Toon voorraad van dit pakket">
+                                        {{ $parcel->parcel_no }}
+                                        <svg class="opacity-0 group-hover:opacity-100 transition-opacity text-indigo-400 w-4 h-4 ml-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                    </a>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded 
+                                            {{ $parcel->status == 'arrived' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500' }}">
+                                            {{ $parcel->status == 'arrived' ? 'Ontvangen' : ($parcel->status == 'shipped' ? 'Onderweg' : 'Prep') }}
+                                        </span>
+                                        @if($parcel->description)
+                                            <span class="text-xs text-slate-500 font-medium truncate max-w-[120px]" title="{{ $parcel->description }}">{{ $parcel->description }}</span>
+                                        @endif
+                                    </div>
                                 </div>
                             </div>
                             <div class="opacity-0 group-hover:opacity-100 transition flex items-center gap-2">
